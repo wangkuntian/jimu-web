@@ -1,0 +1,124 @@
+name: Release
+
+# tag 只负责发布已经验证过的 master tip。
+# 候选 PR 的常规门禁由 ci.yml 的 CI Gate 承担，这里只校验 tag 与当前 master tip 一致，
+# 避免绕过 PR 直接给旧提交或分支提交打 tag。
+#
+# 发布物：dist/ 的静态资源包 jimu-portal-<tag>.tar.gz（解压后作为站点根目录部署）。
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify Tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify the tag points at the current master tip
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin master
+          tag_sha=$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{commit}")
+          master_sha=$(git rev-parse "origin/master^{commit}")
+          if [ "$tag_sha" != "$master_sha" ]; then
+            echo "Tag ${GITHUB_REF_NAME} points to ${tag_sha}, but origin/master is ${master_sha}."
+            echo "Tag the master tip only, after the release PR has merged."
+            exit 1
+          fi
+          echo "${GITHUB_REF_NAME} matches origin/master at ${master_sha}."
+
+  build:
+    name: Build
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Require the release notes file
+        run: |
+          set -euo pipefail
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ ! -f "$notes" ]; then
+            echo "::error::missing release notes: $notes (see docs/CONTRIBUTING.md)"
+            exit 1
+          fi
+          echo "found $notes"
+
+      - run: pnpm run build
+
+      - name: '📦 Package the static assets'
+        run: |
+          set -euo pipefail
+          bundle="jimu-portal-${GITHUB_REF_NAME}.tar.gz"
+          tar -czf "$bundle" -C dist .
+          ls -l "$bundle"
+
+      - name: '📤 Upload the release bundle'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-bundle
+          path: jimu-portal-*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish Release
+    needs: [verify, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: '📥 Download the release bundle'
+        uses: actions/download-artifact@v8
+        with:
+          name: release-bundle
+          path: dist
+
+      - name: '🔎 List the release assets'
+        run: ls -l dist
+
+      - name: Read the release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          notes_file="docs/releases/${version}.md"
+          # build job 已确认文件存在；这里只做组装，缺失时直接失败而不是静默降级
+          [ -f "$notes_file" ] || {
+            echo "::error::missing release notes: $notes_file"
+            exit 1
+          }
+          {
+            echo "body<<EOF"
+            cat "$notes_file"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          files: dist/jimu-portal-*.tar.gz
+          draft: false
+          prerelease: false
