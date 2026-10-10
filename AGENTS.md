@@ -53,7 +53,12 @@
 
 ## Commit Message
 
-使用 Conventional Commits 轻量格式 `type(scope): summary`；`type` 取 `feat` / `fix` / `docs` / `test` / `refactor` / `chore`。summary 与正文全部使用英文：小写开头、祈使句、不加句号；一个 commit 只包含一个清晰主题。
+使用 Conventional Commits 轻量格式 `type(scope): summary`。
+
+- `type` 取 `feat` / `fix` / `docs` / `test` / `refactor` / `perf` / `ci` / `chore`。
+- `scope` 必填，用受影响区域的小写短横线名（如 `repo`、`ci`、`actions`、`plans`、`api`、`portal`）；CI 相关改动可用 `ci(<area>)` 或 `chore(ci)`。
+- summary 与正文全部使用英文：小写开头、祈使句、不加句号；不使用 `update code`、`fix bug` 这类无信息量 summary。
+- 一个 commit 只包含一个清晰主题。
 
 与后端仓库保持同一约定。本仓库暂无 `githooks/commit-msg` 强制检查，仍需手写遵守。
 
