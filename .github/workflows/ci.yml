@@ -76,12 +76,17 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch --no-tags origin "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
+      # 依赖 PR 的豁免按「PR 作者」判定，不用 github.actor：维护者在 PR 页面点一次 Update branch，
+      # 新 run 的 actor 就变成维护者本人，按 actor 判定会让依赖 PR 突然被要求同步版本日志
+      # （实测：PR #3 上 update-branch 后 Policy 即失败）。
+      # 用 contains 而不是相等比较：bot 登录名在 webhook/REST 里是 dependabot[bot]，在 GraphQL 里渲染为
+      # app/dependabot，子串匹配对两种表示都成立。
       - name: '📝 Commit message policy'
-        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.user.login, 'dependabot')
         run: bash scripts/check_commit_messages.sh "origin/${{ github.base_ref }}" HEAD
 
       - name: '📄 Release notes policy'
-        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.user.login, 'dependabot')
         run: |
           set -euo pipefail
           changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
