@@ -1,0 +1,90 @@
+version: 2
+updates:
+  # npm 依赖：先按家族分组（同族通常要一起动），再用兜底组收长尾 minor/patch。
+  # Dependabot 把依赖分配给「第一个匹配的组」，所以家族组必须排在兜底组之前。
+  # 不设自动合并：本仓的 CI Gate 是唯一门禁，依赖升级一律人工确认。
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+      - 'npm'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    groups:
+      vue-runtime:
+        patterns:
+          - 'vue'
+          - 'vue-router'
+          - 'pinia'
+          - '@tanstack/vue-query'
+      vue-tooling:
+        patterns:
+          - '@vitejs/plugin-vue'
+          - '@vue/*'
+          - 'vue-tsc'
+          - 'vue-eslint-parser'
+      build:
+        patterns:
+          - 'vite'
+          - 'typescript'
+          - '@tsconfig/*'
+      lint-format:
+        patterns:
+          - 'eslint'
+          - 'eslint-config-prettier'
+          - 'eslint-plugin-*'
+          - 'prettier'
+          - 'jiti'
+      test:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+          - '@playwright/test'
+          - '@vue/test-utils'
+          - 'jsdom'
+          - '@types/jsdom'
+      ui:
+        patterns:
+          - 'element-plus'
+          - '@lucide/vue'
+      api-tooling:
+        patterns:
+          - 'openapi-typescript'
+          - 'swagger2openapi'
+      types:
+        patterns:
+          - '@types/*'
+      # 兜底：其余 minor/patch 合成一个 PR；major 仍单独开，便于逐个评估
+      everything-else:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+  # GitHub Actions：升级 actions 版本（与 release.yml / ci.yml 中的 tag 对应）
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Shanghai'
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+      - 'github-actions'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    groups:
+      actions:
+        patterns:
+          - '*'
