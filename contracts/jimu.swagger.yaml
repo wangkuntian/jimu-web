@@ -1,0 +1,2172 @@
+basePath: /api/v1
+definitions:
+  application.AssignPermissionsRequest:
+    properties:
+      permission_ids:
+        items:
+          type: integer
+        type: array
+    required:
+    - permission_ids
+    type: object
+  application.AssignPlanRequest:
+    properties:
+      plan_id:
+        type: integer
+    type: object
+  application.BatchDeleteRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        maxItems: 100
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  application.CreatePermissionRequest:
+    properties:
+      action:
+        type: string
+      name:
+        type: string
+      resource:
+        type: string
+    required:
+    - action
+    - name
+    - resource
+    type: object
+  application.CreatePlanRequest:
+    properties:
+      code:
+        maxLength: 32
+        minLength: 1
+        type: string
+      max_api_keys:
+        description: 0=不限
+        minimum: 0
+        type: integer
+      max_roles:
+        description: 0=不限
+        minimum: 0
+        type: integer
+      max_users:
+        description: 0=不限
+        minimum: 0
+        type: integer
+      name:
+        maxLength: 64
+        minLength: 1
+        type: string
+    required:
+    - code
+    - name
+    type: object
+  application.CreateRoleRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  application.CreateTenantRequest:
+    properties:
+      code:
+        maxLength: 64
+        type: string
+      name:
+        maxLength: 128
+        minLength: 1
+        type: string
+    required:
+    - code
+    - name
+    type: object
+  application.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 32
+        minLength: 6
+        type: string
+      phone:
+        type: string
+      username:
+        maxLength: 64
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  application.UpdatePermissionRequest:
+    properties:
+      action:
+        type: string
+      name:
+        type: string
+      resource:
+        type: string
+    required:
+    - action
+    - name
+    - resource
+    type: object
+  application.UpdatePlanRequest:
+    properties:
+      max_api_keys:
+        minimum: 0
+        type: integer
+      max_roles:
+        minimum: 0
+        type: integer
+      max_users:
+        minimum: 0
+        type: integer
+      name:
+        maxLength: 64
+        minLength: 1
+        type: string
+    type: object
+  application.UpdateRoleRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  application.UpdateTenantRequest:
+    properties:
+      name:
+        maxLength: 128
+        minLength: 1
+        type: string
+      status:
+        enum:
+        - 0
+        - 1
+        type: integer
+    type: object
+  application.UpdateUserRequest:
+    properties:
+      status:
+        enum:
+        - 0
+        - 1
+        type: integer
+    type: object
+  application.VerifyResult:
+    properties:
+      broken_at:
+        description: 首个异常条目 ID
+        type: integer
+      checked:
+        description: 参与校验的已哈希条目数
+        type: integer
+      head_hash:
+        description: 链头记录的哈希
+        type: string
+      intact:
+        description: 链是否完整
+        type: boolean
+      last_hash:
+        description: 扫描到的最后一条哈希
+        type: string
+      reason:
+        description: 异常原因
+        type: string
+      tail_intact:
+        description: 链尾是否与链头一致（检测末尾条目被删）
+        type: boolean
+      unhashed:
+        description: 迁移前未哈希的存量条目数
+        type: integer
+    type: object
+  contract.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+      request_id:
+        type: string
+    type: object
+  contract.PageResponse:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      request_id:
+        type: string
+      total:
+        type: integer
+    type: object
+  interfaces.disableTOTPRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  interfaces.enableTOTPRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  interfaces.forgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  interfaces.loginRequest:
+    properties:
+      captcha_code:
+        type: string
+      captcha_id:
+        description: 验证码（登录时可选，注册时如果开启验证码则必填）
+        type: string
+      email:
+        description: 邮箱（注册时可选收集，用于密码重置与通知；登录忽略）
+        type: string
+      password:
+        description: 密码（8-32 位，必须包含字母和数字）
+        maxLength: 32
+        minLength: 8
+        type: string
+      phone:
+        description: 手机号（注册时可选收集；登录忽略）
+        type: string
+      remember_device:
+        description: 记住此设备：登录成功后签发设备令牌，后续登录携带 X-Device-Token 可跳过 TOTP（密码仍必需）
+        type: boolean
+      tenant_code:
+        description: 租户编码（开通式注册时可选；不传自动生成，仅限字母/数字/短横线/下划线）
+        maxLength: 64
+        type: string
+      tenant_name:
+        description: 租户名称（开通式注册时必填：注册即开通新租户，注册者成为 owner）
+        maxLength: 128
+        minLength: 1
+        type: string
+      totp_code:
+        description: TOTP 二次验证码（用户启用 TOTP 后登录必填，6 位数字）
+        type: string
+      username:
+        description: 用户名（4-20 位字母、数字或下划线）
+        maxLength: 20
+        minLength: 4
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  interfaces.refreshRequest:
+    properties:
+      refresh_token:
+        description: 刷新令牌（从登录或刷新接口获取）
+        type: string
+    required:
+    - refresh_token
+    type: object
+  interfaces.resetPasswordRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+      new_password:
+        maxLength: 32
+        minLength: 8
+        type: string
+    required:
+    - code
+    - email
+    - new_password
+    type: object
+  interfaces.webAuthnBeginRequest:
+    properties:
+      name:
+        maxLength: 64
+        type: string
+    type: object
+  interfaces.webAuthnLoginBeginRequest:
+    properties:
+      username:
+        maxLength: 64
+        minLength: 3
+        type: string
+    required:
+    - username
+    type: object
+  interfaces.webAuthnRenameRequest:
+    properties:
+      name:
+        maxLength: 64
+        minLength: 1
+        type: string
+    required:
+    - name
+    type: object
+  response.Body:
+    properties:
+      code:
+        type: integer
+      data: {}
+      details: {}
+      message:
+        type: string
+      request_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Jimu 后端框架 API - 提供用户认证、权限管理、角色管理、系统监控等功能
+  title: Jimu API
+  version: "1.0"
+paths:
+  /api/v1/admin/error-codes:
+    get:
+      description: 获取所有业务错误码及其对应的 HTTP 状态码映射。用于前端和第三方系统集成时参考。包含错误码、错误消息、HTTP 状态码和分类信息。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回错误码列表
+          schema:
+            $ref: '#/definitions/response.Body'
+      summary: 获取错误码列表
+      tags:
+      - 系统管理
+  /api/v1/admin/ratelimit/auth:
+    get:
+      description: 不消费令牌地返回某 scope（如 login）+ key（如 ip:1.2.3.4）当前的计数与剩余窗口
+      parameters:
+      - description: 限流作用域
+        enum:
+        - login
+        - register
+        in: query
+        name: scope
+        required: true
+        type: string
+      - description: 限流键（如 ip:1.2.3.4 或 username:alice）
+        in: query
+        name: key
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      summary: 查看认证限流状态
+      tags:
+      - admin/ratelimit
+  /audits:
+    get:
+      description: 分页获取系统审计日志。记录用户的操作行为（如登录、创建、修改、删除等），用于安全审计和行为追踪。支持按 ID、创建时间排序。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 排序字段（支持 id、created_at，默认 id）
+        in: query
+        name: sort
+        type: string
+      - description: 排序方向（asc 或 desc，默认 desc）
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回分页审计日志列表
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "400":
+          description: 参数错误（如无效的排序字段）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取审计日志列表
+      tags:
+      - 审计日志
+  /audits/{id}:
+    get:
+      description: 根据审计日志 ID 获取详细信息，包括操作用户、操作类型、资源、详情、IP 地址、HTTP 方法、请求路径和状态码。
+      parameters:
+      - description: 审计日志 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回审计日志详情
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 审计日志不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取审计日志详情
+      tags:
+      - 审计日志
+  /audits/export:
+    get:
+      description: 按时间范围流式导出当前租户的审计日志（平台级视角导出全部租户）。format=csv（默认，含 UTF-8 BOM）或 json（NDJSON，每行一个对象）；单次最多
+        50000 条、跨度最多 90 天，超过返回参数错误，请缩小时间范围。
+      parameters:
+      - description: 导出格式：csv（默认）或 json
+        in: query
+        name: format
+        type: string
+      - description: 起始时间（RFC3339，默认 7 天前）
+        in: query
+        name: start
+        type: string
+      - description: 结束时间（RFC3339，默认当前）
+        in: query
+        name: end
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: 导出文件内容
+          schema:
+            type: string
+        "400":
+          description: 参数错误（格式、时间范围或条数超限）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 导出审计日志
+      tags:
+      - 审计日志
+  /audits/verify:
+    get:
+      description: 按 ID 升序重算审计日志的链式哈希（HMAC-SHA256/SHA-256）并检查前后衔接，用于发现篡改或删除。返回参与校验的条目数、未哈希的存量条目数、是否完整、首个异常条目与原因；单租户全量校验时还会比对链头检测末尾条目被删除。
+      parameters:
+      - description: 起始条目 ID（含），默认从头开始
+        in: query
+        name: from_id
+        type: integer
+      - description: 结束条目 ID（含），默认到最后
+        in: query
+        name: to_id
+        type: integer
+      - description: 最多校验条数（默认 1000）
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回校验结果
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/application.VerifyResult'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 校验审计链完整性
+      tags:
+      - 审计日志
+  /auth/devices:
+    delete:
+      description: 注销当前用户全部可信设备，用于设备丢失或异常登录后的止损。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 注销全部可信设备
+      tags:
+      - 认证
+    get:
+      description: 返回当前用户的可信设备（登录时可跳过 TOTP 的设备）。密码始终必需，设备令牌仅替代 TOTP 因子；改密或登出全部设备会吊销全部可信设备。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回可信设备列表
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取可信设备列表
+      tags:
+      - 认证
+  /auth/devices/{id}:
+    delete:
+      description: 按 ID 注销当前用户的一个可信设备，注销后该设备登录需重新提供 TOTP。
+      parameters:
+      - description: 设备 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回已注销设备 ID
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（设备 ID 非法）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 注销可信设备
+      tags:
+      - 认证
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: 向指定邮箱发送 6 位数字验证码。用户不存在也返回成功，防止邮箱枚举探测。
+      parameters:
+      - description: 邮箱
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.forgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功（无论邮箱是否存在）
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "429":
+          description: 请求过于频繁
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 发送密码重置验证码
+      tags:
+      - 认证
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 使用用户名和密码进行身份验证，成功返回访问令牌和刷新令牌。支持 IP 和用户名维度的限流保护。
+      parameters:
+      - description: 登录信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回 accessToken 和 refreshToken
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（用户名或密码格式不符）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 认证失败（用户名或密码错误）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "429":
+          description: 请求过于频繁，请稍后再试
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 用户登录
+      tags:
+      - 认证
+  /auth/login-history:
+    get:
+      description: 分页返回当前用户的登录历史（成功/失败/锁定），含时间、IP 与 User-Agent，用于异常登录自查。按 id 倒序。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回登录历史分页数据
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取登录历史
+      tags:
+      - 认证
+  /auth/logout:
+    post:
+      description: 撤销当前会话的刷新令牌，使其失效。需要有效的访问令牌进行身份验证。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证或会话无效
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 退出当前会话
+      tags:
+      - 认证
+  /auth/logout-all:
+    post:
+      description: 撤销该用户的所有刷新会话，强制所有设备重新登录。需要有效的访问令牌进行身份验证。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证或会话无效
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 退出所有会话
+      tags:
+      - 认证
+  /auth/mfa/disable:
+    post:
+      consumes:
+      - application/json
+      description: 校验当前验证码后关闭 TOTP 并清除密钥。关闭后登录不再要求 TOTP 码。
+      parameters:
+      - description: 当前验证码
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.disableTOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 未认证或验证码无效
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 关闭 TOTP 二次验证
+      tags:
+      - 认证
+  /auth/mfa/enable:
+    post:
+      consumes:
+      - application/json
+      description: 用认证器生成的首次验证码确认启用 TOTP。验证码通过后该用户登录必须提供 TOTP 码。
+      parameters:
+      - description: 首次验证码
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.enableTOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 未认证或验证码无效
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 启用 TOTP 二次验证
+      tags:
+      - 认证
+  /auth/mfa/setup:
+    post:
+      description: 生成新的 TOTP 密钥并返回 otpauth URI（用于二维码/认证器绑定）。重复调用会轮换密钥。绑定后需调用启用接口用首次验证码确认。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回 secret 与 otpauth URI
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证或会话无效
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 生成 TOTP 绑定密钥
+      tags:
+      - 认证
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: 使用有效的刷新令牌获取新的访问令牌。刷新令牌轮换机制会同时生成新的刷新令牌，旧的刷新令牌失效。
+      parameters:
+      - description: 刷新令牌
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回新的 token 对
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 刷新令牌无效或已过期
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 刷新访问令牌
+      tags:
+      - 认证
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        注册新用户账户。仅当系统配置中 public_registration 为 true 时可用。支持 IP 维度的限流保护。
+        开通式注册（auth.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
+        普通注册（未启用开通式）时忽略租户字段，用户归默认租户，返回用户信息。
+        开通式注册的 tenant_code 统一转小写存储，不传则自动生成；未传 tenant_name 报参数错误。
+      parameters:
+      - description: 注册信息（用户名和密码；开通式注册另需 tenant_name）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回用户信息（开通式注册额外返回 tenant）
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（如用户名已存在、租户编码格式无效或已存在）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "429":
+          description: 请求过于频繁
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 用户注册
+      tags:
+      - 认证
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: 用邮箱验证码设置新密码。验证码一次性，重置成功后强制登出该用户全部会话。
+      parameters:
+      - description: 邮箱、验证码、新密码
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误或验证码无效/已过期
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "429":
+          description: 请求过于频繁
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 重置密码
+      tags:
+      - 认证
+  /auth/webauthn/credentials:
+    get:
+      description: 返回当前用户已注册的通行密钥（不含公钥等敏感字段），用于设备管理与注销。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回通行密钥列表
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取通行密钥列表
+      tags:
+      - 认证
+  /auth/webauthn/credentials/{id}:
+    delete:
+      description: 删除当前用户的某个通行密钥；删除最后一个凭证后该账号不能再使用通行密钥登录（密码登录不受影响）。
+      parameters:
+      - description: 凭证 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除通行密钥
+      tags:
+      - 认证
+    put:
+      consumes:
+      - application/json
+      description: 修改当前用户某个通行密钥的名称。
+      parameters:
+      - description: 凭证 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 新名称
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.webAuthnRenameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 重命名通行密钥
+      tags:
+      - 认证
+  /auth/webauthn/login/begin:
+    post:
+      consumes:
+      - application/json
+      description: 按用户名生成 WebAuthn 登录断言（allowCredentials 为该用户已注册凭证）与一次性 session_id。用户不存在或未注册凭证时返回错误，不泄漏账号是否存在之外的信息。支持
+        IP 与用户名维度限流。
+      parameters:
+      - description: 用户名
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.webAuthnLoginBeginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回 session_id 与登录选项
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 认证失败（用户不存在或已禁用）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 该用户未注册通行密钥（2010）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "429":
+          description: 请求过于频繁
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 开始通行密钥登录
+      tags:
+      - 认证
+  /auth/webauthn/login/finish:
+    post:
+      consumes:
+      - application/json
+      description: 校验浏览器返回的登录断言（签名、挑战、计数器），通过后签发 access/refresh token。通行密钥是抗钓鱼的强因子，因此不再要求密码，也不叠加
+        TOTP。session_id 取自 begin 响应；请求体为 navigator.credentials.get() 的原始 JSON。
+      parameters:
+      - description: begin 接口返回的 session_id
+        in: query
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回 accessToken 和 refreshToken
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 断言校验失败（2011）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "429":
+          description: 请求过于频繁
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      summary: 完成通行密钥登录
+      tags:
+      - 认证
+  /auth/webauthn/register/begin:
+    post:
+      consumes:
+      - application/json
+      description: 为当前登录用户生成 WebAuthn 注册选项（publicKey）与一次性 session_id。客户端调用 navigator.credentials.create()
+        后，把返回的凭证 JSON 原样提交到 finish 接口。需要浏览器与 HTTPS（localhost 除外）。
+      parameters:
+      - description: 凭证名称（可选，便于识别设备）
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/interfaces.webAuthnBeginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回 session_id 与注册选项
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: WebAuthn 未配置
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 开始注册通行密钥
+      tags:
+      - 认证
+  /auth/webauthn/register/finish:
+    post:
+      consumes:
+      - application/json
+      description: 校验浏览器返回的注册凭证（证明与挑战），通过后保存公钥。session_id 取自 begin 响应；请求体为 navigator.credentials.create()
+        的原始 JSON。
+      parameters:
+      - description: begin 接口返回的 session_id
+        in: query
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回已注册凭证信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 凭证校验失败（2011）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 完成注册通行密钥
+      tags:
+      - 认证
+  /captcha:
+    get:
+      description: 生成图形验证码，返回 captcha_id 与 base64 图片
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回 captcha_id 和 captcha_image
+          schema:
+            $ref: '#/definitions/response.Body'
+      summary: 获取验证码
+      tags:
+      - 验证码
+  /oauth/{provider}/callback:
+    get:
+      description: 处理第三方授权回调，签发 JWT
+      parameters:
+      - description: 提供商
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: 授权码
+        in: query
+        name: code
+        required: true
+        type: string
+      - description: 状态
+        in: query
+        name: state
+        required: true
+        type: string
+      responses:
+        "200":
+          description: 登录成功
+          schema:
+            $ref: '#/definitions/response.Body'
+      summary: OAuth 回调
+      tags:
+      - OAuth
+  /oauth/{provider}/login:
+    get:
+      description: 重定向到第三方授权页
+      parameters:
+      - description: 提供商名（内置 google/github/wechat，或配置了 issuer_url 的自定义 OIDC 提供商）
+        in: path
+        name: provider
+        required: true
+        type: string
+      responses:
+        "302":
+          description: Found
+      summary: OAuth 登录跳转
+      tags:
+      - OAuth
+  /permissions:
+    get:
+      description: 分页获取权限列表。支持按 ID、名称、资源路径、操作类型、创建时间排序。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 排序字段（支持 id、name、resource、action、created_at，默认 id）
+        in: query
+        name: sort
+        type: string
+      - description: 排序方向（asc 或 desc，默认 desc）
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回分页权限列表
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "400":
+          description: 参数错误（如无效的排序字段）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取权限列表
+      tags:
+      - 权限管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新权限。权限由资源路径（resource）和操作类型（action）唯一标识，用于控制 API 访问。
+      parameters:
+      - description: 权限信息（名称、资源路径、操作类型）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.CreatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 创建成功，返回权限信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（如名称为空）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 权限已存在（resource + action 重复）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建权限
+      tags:
+      - 权限管理
+  /permissions/{id}:
+    delete:
+      description: 软删除指定权限。删除后权限数据仍保留在数据库中，但无法分配给角色。
+      parameters:
+      - description: 权限 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: 删除成功，无返回内容
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除权限
+      tags:
+      - 权限管理
+    get:
+      description: 根据权限 ID 获取权限详细信息，包括资源路径和操作类型。
+      parameters:
+      - description: 权限 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回权限信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 权限不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取权限详情
+      tags:
+      - 权限管理
+    put:
+      consumes:
+      - application/json
+      description: 更新指定权限的名称、资源路径或操作类型。
+      parameters:
+      - description: 权限 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 要更新的权限信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.UpdatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 权限不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 权限冲突（resource + action 重复）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新权限信息
+      tags:
+      - 权限管理
+  /roles:
+    get:
+      description: 分页获取角色列表。支持按 ID、名称、创建时间排序。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 排序字段（支持 id、name、created_at，默认 id）
+        in: query
+        name: sort
+        type: string
+      - description: 排序方向（asc 或 desc，默认 desc）
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回分页角色列表
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "400":
+          description: 参数错误（如无效的排序字段）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取角色列表
+      tags:
+      - 角色管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新角色。角色名称必须唯一，用于权限管理和访问控制。
+      parameters:
+      - description: 角色信息（名称和描述）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 创建成功，返回角色信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（如名称为空）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 角色名称已存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建角色
+      tags:
+      - 角色管理
+  /roles/{id}:
+    delete:
+      description: 软删除指定角色。删除后角色数据仍保留在数据库中，但无法分配给用户。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: 删除成功，无返回内容
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除角色
+      tags:
+      - 角色管理
+    get:
+      description: 根据角色 ID 获取角色详细信息，包括关联的权限列表。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回角色信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 角色不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取角色详情
+      tags:
+      - 角色管理
+    put:
+      consumes:
+      - application/json
+      description: 更新指定角色的名称或描述。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 要更新的角色信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 角色不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 角色名称已存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新角色信息
+      tags:
+      - 角色管理
+  /roles/{id}/permissions:
+    post:
+      consumes:
+      - application/json
+      description: 为指定角色分配权限。传入权限 ID 数组，角色将被赋予这些权限。原有权限会被替换。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 权限 ID 列表
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.AssignPermissionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 分配成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效或权限不存在）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 分配角色权限
+      tags:
+      - 角色管理
+  /tenant-plans:
+    get:
+      description: 分页返回全部套餐定义。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回分页套餐列表
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取套餐列表
+      tags:
+      - 租户运营
+    post:
+      consumes:
+      - application/json
+      description: 创建租户套餐（资源上限，0 表示不限）。编码全局唯一，统一转小写存储且不可修改。
+      parameters:
+      - description: 套餐信息（编码、名称与各项上限）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.CreatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 创建成功，返回套餐信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 套餐编码已存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建套餐
+      tags:
+      - 租户运营
+  /tenant-plans/{id}:
+    delete:
+      description: 删除未被任何租户使用的套餐；仍被租户使用时返回 409，避免租户静默失去配额约束。
+      parameters:
+      - description: 套餐 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: 套餐不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 套餐仍被租户使用
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除套餐
+      tags:
+      - 租户运营
+    put:
+      consumes:
+      - application/json
+      description: 更新套餐名称与各项上限；编码不可修改。修改后对使用该套餐的租户立即生效。
+      parameters:
+      - description: 套餐 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 要更新的字段（为空表示不修改）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.UpdatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 套餐不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新套餐
+      tags:
+      - 租户运营
+  /tenants:
+    get:
+      description: 分页获取租户列表。支持按 ID、编码、创建时间排序。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 排序字段（支持 id、code、created_at，默认 id）
+        in: query
+        name: sort
+        type: string
+      - description: 排序方向（asc 或 desc，默认 desc）
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回分页租户列表
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "400":
+          description: 参数错误（如无效的排序字段）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取租户列表
+      tags:
+      - 租户管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新租户。编码全局唯一，仅允许字母、数字、短横线和下划线（统一转小写存储）；创建后编码不可修改。
+      parameters:
+      - description: 租户信息（编码和名称）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.CreateTenantRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 创建成功，返回租户信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（编码格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 租户编码已存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建租户
+      tags:
+      - 租户管理
+  /tenants/{id}:
+    delete:
+      description: 软删除指定租户。默认租户受保护，不可删除。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 租户不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 默认租户不可删除
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除租户
+      tags:
+      - 租户管理
+    get:
+      description: 根据租户 ID 获取租户详细信息。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回租户信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 租户不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取租户详情
+      tags:
+      - 租户管理
+    put:
+      consumes:
+      - application/json
+      description: 更新指定租户的名称或状态。编码不可修改。默认租户可改名但不可删除。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 要更新的租户信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.UpdateTenantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 租户不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新租户信息
+      tags:
+      - 租户管理
+  /tenants/{id}/plan:
+    put:
+      consumes:
+      - application/json
+      description: 为指定租户分配套餐；plan_id=0 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 套餐 ID（0=取消套餐）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.AssignPlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 分配成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 套餐不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 为租户分配套餐
+      tags:
+      - 租户运营
+  /tenants/usage:
+    get:
+      description: 返回当前租户的套餐与各资源用量（用户/角色/API Key）及上限，用于容量自查；未分配套餐时 plan 为 null 且不限量。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回套餐与用量
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前租户用量
+      tags:
+      - 租户运营
+  /users:
+    get:
+      description: 分页获取用户列表。支持按 ID、用户名、创建时间排序，可指定升序或降序。
+      parameters:
+      - description: 页码（默认 1）
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量（默认 20，最大 100）
+        in: query
+        name: page_size
+        type: integer
+      - description: 排序字段（支持 id、username、created_at，默认 id）
+        in: query
+        name: sort
+        type: string
+      - description: 排序方向（asc 或 desc，默认 desc）
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回分页用户列表
+          schema:
+            $ref: '#/definitions/contract.PageResponse'
+        "400":
+          description: 参数错误（如无效的排序字段或排序方向）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取用户列表
+      tags:
+      - 用户管理
+    post:
+      consumes:
+      - application/json
+      description: 创建新用户账户。用户名必须唯一，密码需符合强度要求（8-32位，包含字母和数字）。支持幂等性保护（通过 Idempotency-Key
+        请求头）。
+      parameters:
+      - description: 用户信息（用户名和密码）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 创建成功，返回用户信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（如用户名格式不符、密码强度不足）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "409":
+          description: 用户名已存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建用户
+      tags:
+      - 用户管理
+  /users/{id}:
+    delete:
+      description: 软删除指定用户。删除后用户数据仍保留在数据库中，但无法登录系统。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: 删除成功，无返回内容
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除用户
+      tags:
+      - 用户管理
+    get:
+      description: 根据用户 ID 获取用户详细信息。不包含密码等敏感字段。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功，返回用户信息
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取用户详情
+      tags:
+      - 用户管理
+    put:
+      consumes:
+      - application/json
+      description: 更新指定用户的信息（如状态）。部分字段支持部分更新。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 要更新的用户信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误（ID 格式无效）
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "404":
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新用户信息
+      tags:
+      - 用户管理
+  /users/batch-delete:
+    post:
+      consumes:
+      - application/json
+      description: 批量软删除用户（单次最多 100 个）。返回成功/失败计数。
+      parameters:
+      - description: 要删除的用户 ID 列表
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.BatchDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 操作完成，返回 success/failed 计数
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 批量删除用户
+      tags:
+      - 用户管理
+  /users/export.csv:
+    get:
+      description: 导出所有用户为 CSV 文件。列：ID、用户名、状态、创建时间。
+      parameters:
+      - description: 排序字段（支持 id、username、created_at，默认 id）
+        in: query
+        name: sort
+        type: string
+      - description: 排序方向（asc 或 desc，默认 desc）
+        in: query
+        name: order
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV 文件
+          schema:
+            type: file
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/contract.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: 导出用户列表（CSV）
+      tags:
+      - 用户管理
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+contracts/jimu.swagger.yaml
+contracts/jimu.openapi.yaml
+src/shared/api/generated.ts
