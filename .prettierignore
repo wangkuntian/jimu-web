@@ -3,6 +3,9 @@ dist/
 coverage/
 playwright-report/
 test-results/
+.cache/
+.codebase-memory/
+.pnpm-store/
 pnpm-lock.yaml
 contracts/jimu.swagger.yaml
 contracts/jimu.openapi.yaml
