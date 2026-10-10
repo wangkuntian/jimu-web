@@ -23,7 +23,7 @@ Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管�
 
 ## 前置条件
 
-- Node.js 20.19+、22.13+ 或 24.0+
+- Node.js 22.13+（`package.json` 的 `engines`；pnpm 11 自身要求 Node ≥22.13）
 - pnpm 11.23.0（由 `packageManager` 固定）
 - 可选：运行 E2E 测试时安装 Playwright Chromium 浏览器
 - 本地 API 开发需要另行运行 `jimu` 后端，默认地址为 `http://localhost:8080`
@@ -40,28 +40,39 @@ pnpm run dev
 
 ## CLI 命令
 
-| 命令                   | 用途                                        |
-| ---------------------- | ------------------------------------------- |
-| `pnpm run dev`         | 启动 Vite 开发服务器                        |
-| `pnpm run fmt`         | 使用 Prettier 格式化文件                    |
-| `pnpm run fmt:check`   | 检查格式但不修改文件                        |
-| `pnpm run lint`        | 运行 ESLint                                 |
-| `pnpm run typecheck`   | 运行 Vue TypeScript 类型检查                |
-| `pnpm run test`        | 运行 Vitest 单元测试                        |
-| `pnpm run test:watch`  | 以监听模式运行 Vitest                       |
-| `pnpm run test:e2e`    | 运行 Playwright 端到端测试                  |
-| `pnpm run api:convert` | 将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0 |
-| `pnpm run api:types`   | 从 OpenAPI 契约生成 TypeScript 类型         |
-| `pnpm run api:check`   | 检查 OpenAPI 与 TypeScript 派生文件是否同步 |
-| `pnpm run build`       | 执行类型检查并构建生产资源                  |
-| `pnpm run preview`     | 预览生产构建                                |
-| `pnpm run check`       | 运行 API、格式、lint、类型、单测和构建检查  |
+| 命令                     | 用途                                                         |
+| ------------------------ | ------------------------------------------------------------ |
+| `pnpm run dev`           | 启动 Vite 开发服务器                                         |
+| `pnpm run fmt`           | 使用 Prettier 格式化文件                                     |
+| `pnpm run fmt:check`     | 检查格式但不修改文件                                         |
+| `pnpm run lint`          | 运行 ESLint                                                  |
+| `pnpm run typecheck`     | 运行 Vue TypeScript 类型检查                                 |
+| `pnpm run test`          | 运行 Vitest 单元测试                                         |
+| `pnpm run test:watch`    | 以监听模式运行 Vitest                                        |
+| `pnpm run test:e2e`      | 运行 Playwright 端到端测试                                   |
+| `pnpm run api:convert`   | 将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0                  |
+| `pnpm run api:types`     | 从 OpenAPI 契约生成 TypeScript 类型                          |
+| `pnpm run api:check`     | 检查 OpenAPI 与 TypeScript 派生文件是否同步                  |
+| `pnpm run hooks:install` | 安装 commit-msg 钩子（`git config core.hooksPath githooks`） |
+| `pnpm run build`         | 执行类型检查并构建生产资源                                   |
+| `pnpm run preview`       | 预览生产构建                                                 |
+| `pnpm run check`         | 运行 API、格式、lint、类型、单测和构建检查                   |
 
 提交前至少运行：
 
 ```bash
 pnpm run check
 ```
+
+## 开发流程
+
+分支、提交消息、PR、CI 与发布的完整约定见[贡献指南](docs/CONTRIBUTING.md)。要点：
+
+- `master` 有分支保护（规则集 `protect master`）：只能经 PR 合入，required check 是聚合检查 `CI Gate`，禁止强推与删除分支。
+- 提交消息使用 Conventional Commits `type(scope): summary`；`pnpm run hooks:install` 启用本地钩子，CI 的 `Policy` job 兜底。
+- 改动产品代码（`src/`、`index.html`、`package.json`）的 PR 必须同步更新 `docs/releases/v<version>.md`。
+- 纯文档 PR 只跑 `Policy` 与 `CI Gate`，其余 job 显式跳过。
+- 依赖更新由 dependabot 每周开 PR，不自动合并。
 
 ## OpenAPI 契约
 
@@ -107,9 +118,12 @@ Workspace
 
 ```text
 jimu-web/
+├── .github/            # CI 与发布 workflow、PR / issue 模板、dependabot
 ├── contracts/          # 固定的 Swagger 来源、OpenAPI 3 派生物和后端提交
-├── docs/               # 设计文档和实现计划
+├── docs/               # 贡献指南、版本日志、设计文档和实现计划
 ├── e2e/                # Playwright 端到端测试
+├── githooks/           # commit-msg 提交消息钩子
+├── scripts/            # 提交消息与聚合门禁校验脚本
 ├── src/
 │   ├── app/             # 应用路由
 │   ├── shared/api/      # 生成的 API 类型
@@ -125,9 +139,11 @@ jimu-web/
 - Vitest 当前验证产品名称和工作区入口。
 - Playwright 当前验证 `/portal` 页面标题和平台工作区标题。
 - 登录、会话刷新、租户范围和无权限访问测试将在对应功能实现时补充。
-- `pnpm run check` 是本地质量门禁；CI 使用同一组脚本。
+- `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
 ## 相关文档
 
+- [贡献指南](docs/CONTRIBUTING.md)：分支、提交消息、PR、CI 与发布流程
+- [版本日志 v0.1.0](docs/releases/v0.1.0.md)
 - [Jimu Portal 前端设计](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)
 - [初始化实现计划](docs/superpowers/plans/2026-09-20-jimu-web-bootstrap.md)

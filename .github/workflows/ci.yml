@@ -1,24 +1,247 @@
 name: CI
 
+# 唯一的质量管线：一个 router 决定「这次提交要跑什么」，各领域 job 用 job 级 if 消费 router 输出，
+# 最后由稳定的聚合检查 CI Gate 收口 —— 分支保护只 required 这一个名字。
+#
+# 不要改用 trigger 级 on.pull_request.paths：被路径过滤掉的 required check 会永久 pending，
+# 把「没跑」伪装成「还在等」。job 级 if 让被跳过的 job 明确报 skipped，由 CI Gate 判定是否合法。
+#
+# 发布走 release.yml，不在本 workflow 里重复。
+
 on:
   push:
+    branches: [master]
   pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  # 单节点 job 使用的 Node 版本；Quality & Tests 另有自己的 engines 矩阵。
+  NODE_VERSION: '22'
+
 jobs:
-  quality:
-    # 固定 runner 版本，避免 ubuntu-latest 迁移带来的不可预期变化。
+  # ── 唯一的 router：一次 diff 分析，产出 code（是否需要跑质量/构建/E2E）─────────────
+  changes:
+    name: Changes
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect what this change touches
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          # 用 here-string 而不是 `printf | grep -q`：后者在输入较大时 grep 提前退出会让 printf 收到
+          # SIGPIPE，配合 `set -o pipefail` 把整条管线判成 141 ⇒ 条件为假 ⇒ 所有内层 job 被跳过而
+          # 门禁报绿（fail-open，可由提交者构造大 changeset 触发）。
+          # code：任何非纯文档改动（纯文档 PR 只跑 Policy，省掉依赖安装与浏览器）
+          if grep -qvE '(^docs/|\.md$|^LICENSE$)' <<<"$changed"; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── 策略层：提交消息与版本日志，不装依赖，故 docs-only PR 也照跑 ────────────────────
+  policy:
+    name: Policy
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch the base branch for diffing
+        if: github.event_name == 'pull_request'
+        run: git fetch --no-tags origin "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: '📝 Commit message policy'
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        run: bash scripts/check_commit_messages.sh "origin/${{ github.base_ref }}" HEAD
+
+      - name: '📄 Release notes policy'
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if ! grep -qE '^(src/|index\.html$|package\.json$)' <<<"$changed"; then
+            echo "✅ no product-code changes; release notes are not required"
+            exit 0
+          fi
+          version=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' package.json | head -1)
+          [ -n "$version" ] || {
+            echo "::error::cannot read version from package.json"
+            exit 1
+          }
+          notes="docs/releases/v${version}.md"
+          if grep -qxF "$notes" <<<"$changed"; then
+            echo "✅ product code changed and ${notes} is updated"
+          else
+            echo "::error::this PR changes product code but does not update ${notes}"
+            echo "👉 Add the entries for this version to ${notes} (see docs/CONTRIBUTING.md)"
+            exit 1
+          fi
+
+      - name: Nothing to check outside pull requests
+        if: github.event_name != 'pull_request'
+        run: echo "✅ policy checks run on pull requests only"
+
+  # ── 质量层：在 engines 声明的 Node 区间各跑一遍（22 / 24），避免声明与真实范围漂移 ────
+  quality:
+    name: Quality & Tests (node ${{ matrix.node }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # engines: >=22.13.0 —— pnpm 11.23.0 自身要求 Node >=22.13（用到 node:sqlite），
+        # 所以没有 node 20 这一档：它在 setup 阶段就会因 pnpm 无法启动而失败
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v7
+
       - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run check
+      - run: pnpm run fmt:check
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm run test
+
+  # ── 契约层：重新生成派生文件，确认与提交内容一致 ────────────────────────────────
+  api:
+    name: API Contract
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # api:check 重新生成 contracts/jimu.openapi.yaml 与 src/shared/api/generated.ts，
+      # 再用 git diff --exit-code 判定是否与提交内容一致。
+      - run: pnpm run api:check
+
+  # ── 构建层：产物供人工下载检查，也为将来的预览部署留出入口 ──────────────────────
+  build:
+    name: Build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+
+      - name: '📤 Upload the build output'
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── 端到端：Playwright chromium，失败时留下 report 与 trace ─────────────────────
+  e2e:
+    name: E2E (Playwright)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:e2e
+
+      - name: '📤 Upload the Playwright report'
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ── 聚合门禁：分支保护唯一 required 的检查名，判定逻辑见 scripts/check_ci_gate.sh ──
+  gate:
+    name: CI Gate
+    if: always()
+    needs: [changes, policy, quality, api, build, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Evaluate the aggregate gate
+        env:
+          ROUTER: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          POLICY: ${{ needs.policy.result }}
+          QUALITY: ${{ needs.quality.result }}
+          API: ${{ needs.api.result }}
+          BUILD: ${{ needs.build.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          set -euo pipefail
+          bash scripts/check_ci_gate.sh "CI Gate" "$ROUTER" \
+            "Policy=${POLICY}=true" \
+            "Quality & Tests=${QUALITY}=${CODE}" \
+            "API Contract=${API}=${CODE}" \
+            "Build=${BUILD}=${CODE}" \
+            "E2E=${E2E}=${CODE}"
