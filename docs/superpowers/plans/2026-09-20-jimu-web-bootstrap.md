@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Repository name is `jimu-web`; product name is `Jimu Portal`.
-- The backend repository at `/Users/king/Documents/Projects/Mine/jimu` is read-only for this task.
+- The backend repository at `../jimu` (relative to this repository root) is read-only for this task.
 - Do not commit, push, or create a pull request unless the user explicitly requests it.
 - Keep the business workspace as a shell; do not invent order, inventory, project, or content APIs.
 - Use the exact `pnpm@11.23.0` version declared by `packageManager` and commit the generated `pnpm-lock.yaml` when the repository is later versioned.
@@ -82,7 +82,7 @@ Use the backend rules as the source for safety, no-automatic-commit, small-scope
 ## 仓库边界
 
 - 本仓库名为 `jimu-web`，产品名为 `Jimu Portal`。
-- 不直接修改 `/Users/king/Documents/Projects/Mine/jimu`；后端变更应在后端仓库中完成。
+- 不直接修改后端仓库（本地默认位于 `../jimu`）；后端变更应在后端仓库中完成。
 - 前后端通过 `contracts/jimu.swagger.yaml`、`contracts/jimu.openapi.yaml` 和 `contracts/backend-commit.txt` 关联。
 - 不在前端复制后端领域规则或自行伪造租户标识。
 
@@ -255,7 +255,7 @@ Expected: 1 test passes with no unhandled Vue warnings.
 
 - [ ] **Step 1: Pin the current backend contract**
 
-Copy `/Users/king/Documents/Projects/Mine/jimu/docs/openapi/swagger.yaml` to `contracts/jimu.swagger.yaml`, convert it to `contracts/jimu.openapi.yaml`, and write the backend HEAD SHA from `git -C /Users/king/Documents/Projects/Mine/jimu rev-parse HEAD` to `contracts/backend-commit.txt`.
+Copy `../jimu/docs/openapi/swagger.yaml` to `contracts/jimu.swagger.yaml`, convert it to `contracts/jimu.openapi.yaml`, and write the backend HEAD SHA from `git -C ../jimu rev-parse HEAD` to `contracts/backend-commit.txt`.
 
 - [ ] **Step 2: Add API type generation**
 
