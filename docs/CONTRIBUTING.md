@@ -175,8 +175,9 @@ pnpm run test:e2e    # Playwright（首次需 pnpm exec playwright install chrom
 
 dependabot 每周一 09:00（Asia/Shanghai）对 npm 与 GitHub Actions 各开一组 PR：同族依赖合并成一个 PR，其余 minor/patch 归入兜底组，major 单独开。配置见 [`.github/dependabot.yml`](../.github/dependabot.yml)。
 
-- dependabot PR 跳过 commit message 与版本日志检查（其余门禁照跑）
-- 不设自动合并，依赖升级由人工确认后合并
+- dependabot PR 跳过 commit message 与版本日志检查（其余门禁照跑）；豁免按 **PR 作者**判定，所以维护者在 PR 页面点 `Update branch` 同步依赖分支不会让这两个检查误触发
+- 需要同步依赖 PR 时优先点 `Update branch`（或评论 `@dependabot rebase`）；分支保护是 `strict`，PR 必须与 `master` 同步后才能合并
+- 不设自动合并，依赖升级由人工确认后合并；major 版本可能不被当前工具链支持（例如 TypeScript 7 尚未被 typescript-eslint / vue-tsc / openapi-typescript 支持），此时应保留 PR 或为该项加 dependabot `ignore` 规则，不要强行合并
 
 ## 报告问题
 
