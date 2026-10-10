@@ -21,8 +21,9 @@
 ## 开发前必读
 
 - 项目定位、技术栈、CLI 命令、目录结构和 OpenAPI 流程见 [README.md](README.md)；前端设计方向见 [Jimu Portal 前端设计](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)。
+- 分支、PR、CI、发布与版本日志流程见 [贡献指南](docs/CONTRIBUTING.md)；首次克隆后运行 `pnpm run hooks:install` 启用 commit-msg 钩子。
 - 修改代码、脚本或目录约定后，必须同步更新 README.md 对应章节。
-- 分支名沿用后端约定：`feature/<issue>-<slug>`，全小写短横线格式。
+- 分支名沿用后端约定：`feature/<issue>-<slug>`，全小写短横线格式；`master` 有分支保护（`protect master`），只能经 PR 合入。
 - 契约变更流程：替换 `contracts/jimu.swagger.yaml` → 更新 `contracts/backend-commit.txt` → 运行 `pnpm run api:types`。
 - 需要后端领域规则（错误码分段、响应结构、归属模型、套餐与配额上限等）时查阅 `jimu` 仓库文档，不在本仓库复述。
 
@@ -60,19 +61,23 @@
 - summary 与正文全部使用英文：小写开头、祈使句、不加句号；不使用 `update code`、`fix bug` 这类无信息量 summary。
 - 一个 commit 只包含一个清晰主题。
 
-与后端仓库保持同一约定。本仓库暂无 `githooks/commit-msg` 强制检查，仍需手写遵守。
+与后端仓库保持同一约定。由 `githooks/commit-msg` 强制检查（`pnpm run hooks:install` 安装，确需跳过用 `git commit --no-verify`），CI 的 `Policy` job 兜底。
 
 ## 质量门禁
 
 - 代码改动先写聚焦测试，并先观察测试失败，再实现最小行为。
-- 提交前运行 `pnpm run check`。
+- 提交前运行 `pnpm run check`；它等价于 CI 的 `Quality & Tests` + `API Contract` + `Build`，`E2E` 用 `pnpm run test:e2e`。
+- 改动产品代码（`src/`、`index.html`、`package.json`）时同步更新 `docs/releases/v<version>.md`，否则 CI 的 `Policy` job 失败。
 - 修改 Swagger 契约时同步更新 `contracts/backend-commit.txt`，再运行 `pnpm run api:types`。
 - 只改文档时至少运行 `pnpm exec prettier --check <file>`。
+- 修改 workflow 时确认 `scripts/check_ci_gate.sh` 的 job 清单与适用标记同步更新（漏一个会让门禁静默失效）。
 - 修改脚本、工具或目录约定时同步更新 `README.md`。
 
 ## 文档维护
 
 - `README.md` 保留使用说明、参数和操作步骤。
+- [贡献指南](docs/CONTRIBUTING.md) 是分支、PR、CI 与发布流程的事实依据；流程变化时同步更新它，不在 AGENTS.md 里复述细节。
+- `docs/releases/<version>.md` 既是版本日志也是 GitHub Release body；改产品代码的 PR 必须同步更新。
 - `docs/superpowers/` 下的文档带日期，是决策记录：方向变化时新增文档或追加说明，不静默改写历史结论。
 - 不复制可从代码或契约派生的清单、数量和目录结构说明。
 
@@ -88,6 +93,7 @@
 - `pnpm run api:convert`：将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0。
 - `pnpm run api:types`：先转换契约，再生成 TypeScript 类型。
 - `pnpm run api:check`：重新生成 API 派生文件并检查是否存在未同步差异。
+- `pnpm run hooks:install`：将 `core.hooksPath` 指向 `githooks/`，启用 commit-msg 校验。
 - `pnpm run build`：构建生产资源。
 - `pnpm run check`：运行 API、格式、lint、类型、单测和构建检查。
 
