@@ -1,0 +1,80 @@
+#!/bin/sh
+# commit-msg: 校验提交消息是否符合 AGENTS.md「Commit Message」规范。
+#
+# 规则：
+#   1. subject 形如 type(scope): summary，type 在白名单内，scope 必填
+#   2. subject 不以句号结尾
+#   3. 全文仅 ASCII（全英文规则）
+#   4. `fixup!` / `squash!` / `amend!` 这类由 autosquash 折叠的临时提交，剥掉前缀后
+#      校验目标提交的消息（折叠后真正进历史的正是后者），不因此挡住标准工作流
+#
+# 单一实现：scripts/check_commit_messages.sh 与 CI 的 Policy job 都调用本文件，
+# 避免本地钩子与 CI 判定漂移（后端的 commit-msg 只拦中日韩字符，本仓额外校验 type(scope)）。
+# 安装：pnpm run hooks:install（即 git config core.hooksPath githooks）
+# 临时跳过：git commit --no-verify
+set -eu
+
+MSG_FILE="${1:-}"
+[ -n "$MSG_FILE" ] && [ -f "$MSG_FILE" ] || exit 0
+
+TYPES='feat|fix|docs|test|refactor|perf|ci|chore'
+
+# 提交者的正文在注释行与空行之后，首行即 subject
+subject="$(grep -v '^[[:space:]]*#' "$MSG_FILE" | sed -n '/[^[:space:]]/{p;q;}')"
+
+# 剥掉 autosquash 前缀；只有前缀没有目标（裸 `fixup!`）时跳过格式校验
+transient=0
+while :; do
+	case "$subject" in
+	'fixup! '* | 'squash! '* | 'amend! '*) subject="${subject#*! }" ;;
+	'fixup!' | 'squash!' | 'amend!')
+		transient=1
+		break
+		;;
+	*) break ;;
+	esac
+done
+
+fail=0
+
+if [ "$transient" -eq 0 ]; then
+	if ! printf '%s' "$subject" | grep -Eq "^(${TYPES})\([a-z0-9][a-z0-9-]*\): [a-z0-9]"; then
+		echo "commit subject must match 'type(scope): summary' with an allowed type and a required scope" >&2
+		echo "  got: ${subject}" >&2
+		fail=1
+	fi
+
+	case "$subject" in
+	*.)
+		echo "commit subject must not end with a period" >&2
+		echo "  got: ${subject}" >&2
+		fail=1
+		;;
+	esac
+fi
+
+if LC_ALL=C grep -q '[^ -~]' "$MSG_FILE"; then
+	echo "commit message must use ASCII only (all-English rule, see AGENTS.md)" >&2
+	LC_ALL=C grep -n '[^ -~]' "$MSG_FILE" | head -5 | sed 's/^/  line /' >&2
+	fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+	cat >&2 <<'EOF'
+
+convention (AGENTS.md「Commit Message」):
+  type(scope): summary
+  type  : feat | fix | docs | test | refactor | perf | ci | chore
+  scope : required, lowercase kebab-case area name
+  rules : English only, lowercase start, imperative, no trailing period, one topic
+
+examples:
+  feat(portal): add a tenant switcher to the portal header
+  ci(actions): upgrade to node24 releases and pin runner
+
+to bypass locally: git commit --no-verify
+EOF
+	exit 1
+fi
+
+exit 0

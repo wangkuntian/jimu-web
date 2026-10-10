@@ -18,6 +18,7 @@
     "api:convert": "swagger2openapi contracts/jimu.swagger.yaml -o contracts/jimu.openapi.yaml --yaml --patch",
     "api:types": "pnpm run api:convert && openapi-typescript contracts/jimu.openapi.yaml -o src/shared/api/generated.ts",
     "api:check": "pnpm run api:types && git diff --exit-code -- contracts/jimu.openapi.yaml src/shared/api/generated.ts",
+    "hooks:install": "git config core.hooksPath githooks",
     "check": "pnpm run api:check && pnpm run fmt:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "dependencies": {
