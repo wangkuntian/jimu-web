@@ -35,6 +35,12 @@ while :; do
 	esac
 done
 
+# 合并提交的消息由 git 生成（本地 merge 时 MERGE_HEAD 存在），同样不参与格式校验；
+# CI 侧由 scripts/check_commit_messages.sh 的 --no-merges 承担同一职责。
+if [ -f "$(git rev-parse --git-dir 2>/dev/null || echo .git)/MERGE_HEAD" ]; then
+	transient=1
+fi
+
 fail=0
 
 if [ "$transient" -eq 0 ]; then
