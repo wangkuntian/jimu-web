@@ -4,7 +4,7 @@
 
 ## 开发环境
 
-- Node.js `^20.19.0 || ^22.13.0 || >=24.0.0`（`package.json` 的 `engines`）
+- Node.js `>=22.13.0`（`package.json` 的 `engines`；pnpm 11 自身要求 Node ≥22.13，Node 20 无法安装依赖）
 - pnpm 11.23.0（由 `packageManager` 固定，唯一包管理器）
 - 可选：本地运行 E2E 时安装 Playwright Chromium
 - 可选：本地联调需要后端 `jimu` 运行在 `http://localhost:8080`
@@ -67,15 +67,15 @@ bash scripts/check_commit_messages.sh origin/master HEAD
 
 `.github/workflows/ci.yml` 是唯一的质量管线：一个 `Changes` router 判断这次改动是不是纯文档，各领域 job 用 **job 级 `if`** 消费它的输出，最后由 `CI Gate` 收口。
 
-| Job                               | 何时运行              | 内容                                                              |
-| --------------------------------- | --------------------- | ----------------------------------------------------------------- |
-| `Changes`                         | 始终                  | diff 分析，产出 `code`（是否非纯文档改动）                        |
-| `Policy`                          | 始终（检查内容仅 PR） | commit message 规范、版本日志同步                                 |
-| `Quality & Tests (node 20/22/24)` | `code=true`           | `fmt:check`、`lint`、`typecheck`、`test`，矩阵覆盖 `engines` 两端 |
-| `API Contract`                    | `code=true`           | `api:check`：重新生成契约派生文件并确认无差异                     |
-| `Build`                           | `code=true`           | `build`，产物上传为 `dist` artifact                               |
-| `E2E (Playwright)`                | `code=true`           | chromium 端到端，失败时上传 report 与 trace                       |
-| `CI Gate`                         | 始终                  | 聚合判定，见下                                                    |
+| Job                            | 何时运行              | 内容                                                                          |
+| ------------------------------ | --------------------- | ----------------------------------------------------------------------------- |
+| `Changes`                      | 始终                  | diff 分析，产出 `code`（是否非纯文档改动）                                    |
+| `Policy`                       | 始终（检查内容仅 PR） | commit message 规范、版本日志同步                                             |
+| `Quality & Tests (node 22/24)` | `code=true`           | `fmt:check`、`lint`、`typecheck`、`test`，矩阵覆盖 `engines` 声明的 Node 区间 |
+| `API Contract`                 | `code=true`           | `api:check`：重新生成契约派生文件并确认无差异                                 |
+| `Build`                        | `code=true`           | `build`，产物上传为 `dist` artifact                                           |
+| `E2E (Playwright)`             | `code=true`           | chromium 端到端，失败时上传 report 与 trace                                   |
+| `CI Gate`                      | 始终                  | 聚合判定，见下                                                                |
 
 约定：
 

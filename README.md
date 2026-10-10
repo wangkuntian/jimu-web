@@ -23,7 +23,7 @@ Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管�
 
 ## 前置条件
 
-- Node.js 20.19+、22.13+ 或 24.0+
+- Node.js 22.13+（`package.json` 的 `engines`；pnpm 11 自身要求 Node ≥22.13）
 - pnpm 11.23.0（由 `packageManager` 固定）
 - 可选：运行 E2E 测试时安装 Playwright Chromium 浏览器
 - 本地 API 开发需要另行运行 `jimu` 后端，默认地址为 `http://localhost:8080`
@@ -139,7 +139,7 @@ jimu-web/
 - Vitest 当前验证产品名称和工作区入口。
 - Playwright 当前验证 `/portal` 页面标题和平台工作区标题。
 - 登录、会话刷新、租户范围和无权限访问测试将在对应功能实现时补充。
-- `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 20/22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
+- `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
 ## 相关文档
 
