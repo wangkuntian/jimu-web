@@ -107,7 +107,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: echo "✅ policy checks run on pull requests only"
 
-  # ── 质量层：在 package.json engines 声明的每个区间各跑一遍（20 / 22 / 24），避免声明漂移 ──
+  # ── 质量层：在 engines 声明的 Node 区间各跑一遍（22 / 24），避免声明与真实范围漂移 ────
   quality:
     name: Quality & Tests (node ${{ matrix.node }})
     needs: changes
@@ -117,8 +117,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # engines: ^20.19.0 || ^22.13.0 || >=24.0.0
-        node: ['20', '22', '24']
+        # engines: >=22.13.0 —— pnpm 11.23.0 自身要求 Node >=22.13（用到 node:sqlite），
+        # 所以没有 node 20 这一档：它在 setup 阶段就会因 pnpm 无法启动而失败
+        node: ['22', '24']
     steps:
       - uses: actions/checkout@v7
 
