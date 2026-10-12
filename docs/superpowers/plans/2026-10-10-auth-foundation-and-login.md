@@ -1506,7 +1506,10 @@ git commit -m "feat(portal): add the auth and portal layouts"
 **Files:**
 
 - Create: `src/app/guards/session.ts`
+- Create: `e2e/helpers/session.ts`
 - Modify: `src/app/router/index.ts`
+- Modify: `e2e/vue.spec.ts`
+- Modify: `e2e/design-tokens.spec.ts`
 - Test: `tests/unit/session-guard.spec.ts`
 
 **Interfaces:**
@@ -1516,6 +1519,9 @@ git commit -m "feat(portal): add the auth and portal layouts"
   - `LOGIN_ROUTE = '/login'`、`DEFAULT_AUTHENTICATED_ROUTE = '/portal'`
   - `resolveSessionNavigation(to: { path: string; fullPath: string; meta: { public?: boolean } }): true | { path: string; query?: Record<string, string> }`
   - `sessionGuard: NavigationGuard`（`resolveSessionNavigation` 的适配器）
+  - `seedSession(page: Page): Promise<void>`（`e2e/helpers/session.ts`，供受保护页面的 E2E 预先写入会话）
+
+**背景：** 本任务的守卫会让未登录访问 `/portal` 被重定向到登录页，而既有的 `e2e/vue.spec.ts` 与 `e2e/design-tokens.spec.ts` 都直接访问 `/portal`，因此必须同时补一个会话播种助手并更新这两个用例，否则它们会失败。
 
 - [ ] **Step 1: 写失败的测试**
 
@@ -1617,7 +1623,7 @@ Run: `pnpm exec vitest run tests/unit/session-guard.spec.ts`
 
 - [ ] **Step 5: 更新路由表**
 
-将 `src/app/router/index.ts` 替换为：
+将 `src/app/router/index.ts` 替换为（**注意：本步不注册 `/login` 路由**，其组件由 Task 9 创建，届时再补上）：
 
 ```ts
 import { createRouter, createWebHistory } from 'vue-router'
@@ -1631,12 +1637,8 @@ const router = createRouter({
       path: '/',
       redirect: '/portal',
     },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('../../features/auth/views/LoginView.vue'),
-      meta: { public: true },
-    },
+    // `/login` 路由由 Task 9 在创建 LoginView.vue 时一并注册。
+    // 此处提前引用不存在的组件文件会让本步的 typecheck 失败。
     {
       path: '/portal',
       name: 'portal',
@@ -1667,16 +1669,61 @@ router.beforeEach(sessionGuard)
 export default router
 ```
 
-- [ ] **Step 6: 检查点**
+守卫的 `LOGIN_ROUTE` 常量在本步已定义，Task 9 复用它注册路由。
 
-```bash
-pnpm run typecheck && pnpm run lint
+## - [ ] **Step 6: 补 E2E 会话播种助手并更新既有用例**
+
+创建 `e2e/helpers/session.ts`：
+
+```ts
+import type { Page } from '@playwright/test'
+
+/**
+ * 在页面脚本执行前写入一个会话，使受保护路由的守卫放行。
+ *
+ * 只写 refresh token 即可：守卫判定的是 hasSession()，即 refresh token 是否存在。
+ * 访问令牌不在存储中，由 API 层刷新获得。
+ */
+export async function seedSession(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('jimu.refresh_token', 'e2e-refresh-token')
+  })
+}
 ```
 
-- [ ] **Step 7: 提交（仅在用户明确指示提交时执行）**
+在 `e2e/vue.spec.ts` 中引入并在导航前调用：
+
+```ts
+import { test, expect } from '@playwright/test'
+
+import { seedSession } from './helpers/session'
+
+test('visits the Jimu Portal shell', async ({ page }) => {
+  await seedSession(page)
+  await page.goto('/portal')
+
+  await expect(page).toHaveTitle('Jimu Portal')
+  await expect(page.getByRole('heading', { name: '平台工作区' })).toBeVisible()
+})
+```
+
+在 `e2e/design-tokens.spec.ts` 的每个用例中同样先调用 `seedSession(page)` 再 `page.goto('/portal')`（两个用例都要加，导入路径为 `./helpers/session`）。
+
+- [ ] **Step 7: 运行 E2E 确认既有用例恢复通过**
+
+Run: `pnpm run test:e2e`
+预期：`vue.spec.ts` 与 `design-tokens.spec.ts` 全部通过（此时尚无 `/login` 路由，`login.spec.ts` 尚不存在）。
+
+- [ ] **Step 8: 检查点**
 
 ```bash
-git add src/app/guards/session.ts src/app/router/index.ts tests/unit/session-guard.spec.ts
+pnpm run check
+```
+
+- [ ] **Step 9: 提交（仅在用户明确指示提交时执行）**
+
+```bash
+git add src/app/guards/session.ts src/app/router/index.ts tests/unit/session-guard.spec.ts e2e/helpers/session.ts e2e/vue.spec.ts e2e/design-tokens.spec.ts
 git commit -m "feat(portal): guard routes by session state"
 ```
 
@@ -1689,11 +1736,14 @@ git commit -m "feat(portal): guard routes by session state"
 - Create: `src/features/auth/views/LoginView.vue`
 - Create: `tests/unit/login-view.spec.ts`
 - Create: `e2e/login.spec.ts`
+- Modify: `src/app/router/index.ts`（注册 `/login` 路由）
 
 **Interfaces:**
 
-- Consumes: `AuthLayout`（Task 7）、`login` / `fetchCaptcha`（Task 6）、`ApiError` / `ErrorCode`（Task 1）
+- Consumes: `AuthLayout`（Task 7）、`login` / `fetchCaptcha`（Task 6）、`ApiError` / `ErrorCode`（Task 1）、`LOGIN_ROUTE`（Task 8）
 - Produces: 登录路由组件（路径 `/login`）
+
+**背景：** Task 8 刻意没有注册 `/login` 路由（其组件文件此时才被创建），因此本任务必须把它补上，否则守卫重定向到的目标不存在，E2E 的重定向用例无法通过。
 
 **实现前：** 按 `AGENTS.md` 执行 UI/UX 规则检索，确认表单无障碍要求：
 
@@ -1909,7 +1959,22 @@ async function handleError(error: unknown): Promise<void> {
 Run: `pnpm exec vitest run tests/unit/login-view.spec.ts`
 预期：PASS，2 个用例通过。
 
-- [ ] **Step 5: 写端到端测试**
+- [ ] **Step 5: 注册 `/login` 路由**
+
+在 `src/app/router/index.ts` 的路由数组中补上登录路由（复用 Task 8 已定义的 `LOGIN_ROUTE` 常量值）：
+
+```ts
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../../features/auth/views/LoginView.vue'),
+      meta: { public: true },
+    },
+```
+
+放在 `/` 重定向之后、`/portal` 之前，并删除 Task 8 留下的那句「`/login` 路由由 Task 9 注册」注释。`meta.public` 是守卫放行未登录访问的标记。
+
+- [ ] **Step 6: 写端到端测试**
 
 创建 `e2e/login.spec.ts`。后端不可用时用 `page.route` 模拟响应。
 
@@ -1988,21 +2053,21 @@ test('shows the backend message when credentials are rejected', async ({ page })
 })
 ```
 
-- [ ] **Step 6: 运行端到端测试**
+- [ ] **Step 7: 运行端到端测试**
 
 Run: `pnpm run test:e2e`
 预期：新增 3 个用例与既有 `vue.spec.ts`、`design-tokens.spec.ts` 全部通过。
 
-- [ ] **Step 7: 检查点**
+- [ ] **Step 8: 检查点**
 
 ```bash
 pnpm run check
 ```
 
-- [ ] **Step 8: 提交（仅在用户明确指示提交时执行）**
+- [ ] **Step 9: 提交（仅在用户明确指示提交时执行）**
 
 ```bash
-git add src/features/auth/views/LoginView.vue tests/unit/login-view.spec.ts e2e/login.spec.ts
+git add src/features/auth/views/LoginView.vue src/app/router/index.ts tests/unit/login-view.spec.ts e2e/login.spec.ts
 git commit -m "feat(auth): add the login page with reactive captcha and totp"
 ```
 
