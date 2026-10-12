@@ -31,6 +31,8 @@ describe('layouts', () => {
     })
 
     expect(wrapper.text()).toContain('Jimu Portal')
+    expect(wrapper.text()).toContain('平台工作区')
+    expect(wrapper.text()).toContain('业务工作区')
     expect(wrapper.text()).toContain('账号安全')
     expect(wrapper.text()).toContain('内容')
   })

@@ -1,29 +1,20 @@
 import { mount } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import PortalLayout from '../../src/layouts/PortalLayout.vue'
+import App from '../../src/App.vue'
 
-const router = createRouter({
-  history: createMemoryHistory(),
-  routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
-})
-
-describe('Jimu Portal shell', () => {
-  it('shows the product name and workspace entry points', () => {
-    const wrapper = mount(PortalLayout, {
-      global: {
-        plugins: [ElementPlus, router],
-        stubs: {
-          RouterLink: { template: '<a><slot /></a>' },
-          RouterView: { template: '<div />' },
-        },
-      },
+describe('App', () => {
+  it('renders the matched route through the router outlet', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<p>路由出口内容</p>' } }],
     })
+    await router.push('/')
+    await router.isReady()
 
-    expect(wrapper.text()).toContain('Jimu Portal')
-    expect(wrapper.text()).toContain('平台工作区')
-    expect(wrapper.text()).toContain('业务工作区')
+    const wrapper = mount(App, { global: { plugins: [router] } })
+
+    expect(wrapper.text()).toContain('路由出口内容')
   })
 })

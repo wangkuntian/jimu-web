@@ -21,8 +21,8 @@ vi.mock('../../src/features/auth/api', () => ({
 // 标签渲染与字段默认可见性，不需要真实导航。
 // onError 接收 Vue 的 errorHandler 回调：异步事件处理函数抛出的异常会走到这里，
 // 用它断言 onSubmit 没有把失败泄漏成未处理拒绝。
-function mountLogin(onError?: (error: unknown) => void) {
-  const router = createRouter({
+function createTestRouter() {
+  return createRouter({
     history: createMemoryHistory(),
     // 兜底路由用于吞掉 createRouter 对初始位置（""）的解析，避免打印
     // "No match found" 警告；组件本身不关心匹配结果。
@@ -31,6 +31,10 @@ function mountLogin(onError?: (error: unknown) => void) {
       { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
     ],
   })
+}
+
+function mountLogin(onError?: (error: unknown) => void) {
+  const router = createTestRouter()
 
   return mount(LoginView, {
     global: {
@@ -135,5 +139,29 @@ describe('LoginView', () => {
 
     expect(wrapper.text()).toContain('验证码无效，请重新输入')
     expect(wrapper.find('[data-test="totp"]').exists()).toBe(true)
+  })
+
+  it('ignores an off-site redirect target and falls back to the portal', async () => {
+    const router = createTestRouter()
+    await router.push({ path: '/login', query: { redirect: '//evil.example' } })
+    await router.isReady()
+
+    vi.mocked(login).mockResolvedValueOnce({
+      access_token: 'a1',
+      refresh_token: 'r1',
+      expires_in: 1800,
+    })
+
+    const wrapper = mount(LoginView, {
+      global: {
+        plugins: [ElementPlus, router],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/portal')
   })
 })

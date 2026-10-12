@@ -54,8 +54,14 @@ async function onSubmit(): Promise<void> {
       remember_device: form.rememberDevice,
     })
 
+    // 只跟随站内绝对路径：`//evil.example` 这类协议相对地址会被浏览器当作外站，
+    // 其余形状（非字符串、相对路径、外站 URL）一律回落到默认入口。
     const redirect = route.query.redirect
-    await router.push(typeof redirect === 'string' ? redirect : '/portal')
+    await router.push(
+      typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+        ? redirect
+        : '/portal',
+    )
   } catch (error) {
     await handleError(error)
   } finally {
