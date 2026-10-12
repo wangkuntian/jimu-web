@@ -13,6 +13,17 @@
     'IBM Plex Sans', 'IBM Plex Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     ui-sans-serif, system-ui, sans-serif;
 
+  /*
+   * 字号层级，取值见 DESIGN.md 第 3 节：说明文字 / 正文 / 小节标题 / 区块标题 / 页面标题。
+   * 字重上限 600，需要强调时用 --jp-font-weight-emphasis，不再写裸字号与裸字重。
+   */
+  --jp-font-size-caption: 12px;
+  --jp-font-size-body: 14px;
+  --jp-font-size-subtitle: 16px;
+  --jp-font-size-title: 20px;
+  --jp-font-size-display: 24px;
+  --jp-font-weight-emphasis: 600;
+
   /* 本项目语义色 */
   --jp-color-text: #161616;
   --jp-color-text-muted: #525252;

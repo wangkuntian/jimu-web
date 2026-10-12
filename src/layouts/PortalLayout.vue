@@ -52,8 +52,8 @@ async function onLogout(): Promise<void> {
 
 .brand {
   color: var(--jp-color-accent);
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: var(--jp-font-size-subtitle);
+  font-weight: var(--jp-font-weight-emphasis);
   text-decoration: none;
 }
 
@@ -63,7 +63,7 @@ async function onLogout(): Promise<void> {
   flex-wrap: wrap;
   gap: 1.25rem;
   color: var(--jp-color-text-muted);
-  font-size: 0.925rem;
+  font-size: var(--jp-font-size-body);
 }
 
 .primary-nav a {
