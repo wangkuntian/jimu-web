@@ -46,7 +46,19 @@ async function doRefresh(): Promise<string | null> {
     return null
   }
 
-  const body = (await response.json()) as RefreshEnvelope
+  let body: RefreshEnvelope | null
+  try {
+    body = (await response.json()) as RefreshEnvelope | null
+  } catch {
+    // 2xx 但响应体不是合法 JSON：服务端或代理异常，不构成 refresh token 失效的证据。
+    return null
+  }
+
+  // JSON 字面量 null 会通过解析但取属性即抛错，同样不是「令牌失效」的证据。
+  if (body === null) {
+    return null
+  }
+
   if (body.code !== 0 || body.data === undefined) {
     clearSession()
     return null

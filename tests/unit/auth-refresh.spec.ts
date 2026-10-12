@@ -155,4 +155,19 @@ describe('refreshAccessToken', () => {
     expect(results).toEqual(['new', 'new', 'new'])
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('resolves to null and keeps the session when a 2xx body is not an envelope', async () => {
+    for (const garbage of ['<html>', 'null']) {
+      clearSession()
+      saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(garbage, { status: 200 })),
+      )
+
+      await expect(refreshAccessToken()).resolves.toBeNull()
+      expect(hasSession()).toBe(true)
+      expect(getAccessToken()).toBe('old')
+    }
+  })
 })
