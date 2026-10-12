@@ -91,7 +91,7 @@ pnpm run api:types
 - `/` 重定向到 `/portal`。
 - `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面；三者均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
 - Pinia 会话 store 只定义前端状态边界，不假设后端登录行为。
-- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖，尚未使用其组件。
+- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；登录页已使用其表单、输入框、按钮与提示组件。
 - API 契约转换、类型生成、格式化、lint、类型检查、单测、E2E 和构建均有独立 CLI。
 
 ## 后续首版目标
