@@ -239,3 +239,4 @@ src/
 - **`sessionStorage` 的取舍**。关闭标签页即需重新登录，是安全与体验的折中；用户可能期望更长的会话。若后续改为持久化，应同时评估 refresh token 的轮换与吊销。
 - **改密体验割裂**。应用内无改密端点，用户改密必须走邮箱验证码；若后端补齐改密端点，应同步替换 `password` 子页。
 - **`openapi-fetch` 的中间件递归风险**。重试必须走裸 `fetch`，否则会再次进入中间件。实现时需有测试覆盖。
+- **（2026-10-12 更正）会话状态的落点。** 决策表把 access token 记为「内存（Pinia）」，实施时落在 `src/shared/auth/session.ts` 的模块级变量：刷新与路由守卫都在模块作用域消费它，不需要响应式 store。`src/stores/session.ts` 的占位 store 因全仓零引用已删除；会话状态以「架构与目录」一节的 `shared/auth/session.ts` 为准。

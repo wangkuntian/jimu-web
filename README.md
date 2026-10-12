@@ -90,7 +90,7 @@ pnpm run api:types
 
 - `/` 重定向到 `/portal`。
 - `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面；三者均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
-- Pinia 会话 store 只定义前端状态边界，不假设后端登录行为。
+- 会话状态由 `src/shared/auth/session.ts` 的模块级变量承载：访问令牌只驻留内存，刷新令牌存 `sessionStorage`，不落盘，也不依赖 Pinia。
 - Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；登录页已使用其表单、输入框、按钮与提示组件。
 - API 契约转换、类型生成、格式化、lint、类型检查、单测、E2E 和构建均有独立 CLI。
 
@@ -131,7 +131,6 @@ jimu-web/
 │   ├── layouts/         # AuthLayout 与 PortalLayout
 │   ├── shared/api/      # 生成的 API 类型、client、信封解包与载荷视图模型
 │   ├── shared/auth/     # 会话存储与刷新
-│   ├── stores/          # Pinia 状态
 │   ├── styles/          # 全局样式与设计 token
 │   └── views/           # 当前静态壳页面
 ├── tests/               # Vitest 单元测试
