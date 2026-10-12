@@ -89,51 +89,6 @@ a {
   color: inherit;
 }
 
-.app-shell {
-  min-height: 100vh;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  min-height: 64px;
-  padding: 0 32px;
-  background: var(--jp-color-surface);
-  border-bottom: 1px solid var(--jp-color-hairline);
-}
-
-.brand {
-  color: var(--jp-color-accent);
-  font-size: 1.05rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.primary-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  color: var(--jp-color-text-muted);
-  font-size: 0.925rem;
-}
-
-.primary-nav a {
-  text-decoration: none;
-}
-
-.primary-nav a.router-link-active,
-.primary-nav a:hover {
-  color: var(--jp-color-accent);
-}
-
-.app-main {
-  width: min(100% - 48px, 1120px);
-  margin: 0 auto;
-  padding: 72px 0;
-}
-
 .page-section {
   max-width: 720px;
 }
@@ -190,18 +145,4 @@ h1 {
 
 .workspace-link:hover {
   background: var(--jp-color-accent-subtle);
-}
-
-@media (max-width: 640px) {
-  .app-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 24px;
-  }
-
-  .app-main {
-    width: min(100% - 32px, 1120px);
-    padding: 48px 0;
-  }
 }
