@@ -24,10 +24,18 @@ const needsCaptcha = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 
-async function loadCaptcha(): Promise<void> {
-  const captcha = await fetchCaptcha()
-  captchaId.value = captcha.captcha_id
-  captchaImage.value = captcha.captcha_image
+/** 拉取验证码；失败时就地反馈，不向上抛出。 */
+async function tryLoadCaptcha(): Promise<boolean> {
+  try {
+    const captcha = await fetchCaptcha()
+    captchaId.value = captcha.captcha_id
+    captchaImage.value = captcha.captcha_image
+    return true
+  } catch {
+    captchaId.value = ''
+    captchaImage.value = ''
+    return false
+  }
 }
 
 async function onSubmit(): Promise<void> {
@@ -71,13 +79,13 @@ async function handleError(error: unknown): Promise<void> {
       return
     case ErrorCode.captchaRequired:
       needsCaptcha.value = true
-      await loadCaptcha()
-      errorMessage.value = '请输入图形验证码'
+      errorMessage.value = (await tryLoadCaptcha()) ? '请输入图形验证码' : '验证码加载失败，请重试'
       return
     case ErrorCode.captchaInvalid:
-      await loadCaptcha()
       form.captchaCode = ''
-      errorMessage.value = '验证码错误，请重新输入'
+      errorMessage.value = (await tryLoadCaptcha())
+        ? '验证码错误，请重新输入'
+        : '验证码加载失败，请重试'
       return
     case ErrorCode.rateLimited:
       errorMessage.value = '尝试过于频繁，请稍后再试'
