@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../api/config'
 import type { TokenPair } from '../api/types'
+import { ErrorCode } from '../api/unwrap'
 import { clearSession, getRefreshToken, saveSession } from './session'
 
 interface RefreshEnvelope {
@@ -59,8 +60,14 @@ async function doRefresh(): Promise<string | null> {
     return null
   }
 
-  if (body.code !== 0 || body.data === undefined) {
+  if (body.code !== ErrorCode.ok) {
     clearSession()
+    return null
+  }
+
+  // code 为 0 说明刷新已被受理，但载荷不是对象（undefined / null / 数字）时取不出令牌。
+  // 这属于服务端异常，不构成「refresh token 已失效」的证据，按既有原则不清理会话。
+  if (body.data === undefined || body.data === null || typeof body.data !== 'object') {
     return null
   }
 
