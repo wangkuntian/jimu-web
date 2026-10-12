@@ -4,7 +4,7 @@
 
 Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管理员、租户管理员和普通业务用户提供统一入口。
 
-当前 Bootstrap 仅建立 Vue 3 SPA、三个静态工作区入口和工程质量工具；平台与租户管理能力尚未接入后端。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
+当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新和路由守卫已接入真实后端；平台与租户管理能力尚未实现。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
 
 ## 仓库边界
 
@@ -89,7 +89,7 @@ pnpm run api:types
 ## 当前 Bootstrap 范围
 
 - `/` 重定向到 `/portal`。
-- `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面。
+- `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面；三者均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
 - Pinia 会话 store 只定义前端状态边界，不假设后端登录行为。
 - Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖，尚未使用其组件。
 - API 契约转换、类型生成、格式化、lint、类型检查、单测、E2E 和构建均有独立 CLI。
@@ -144,7 +144,7 @@ jimu-web/
 - Vitest 当前验证产品名称和工作区入口。
 - Playwright 当前验证 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
 - Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示。
-- 登录、会话刷新、租户范围和无权限访问测试将在对应功能实现时补充。
+- 租户范围和无权限访问测试将在对应功能实现时补充。
 - `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
 ## 相关文档
