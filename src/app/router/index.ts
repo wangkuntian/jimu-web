@@ -9,8 +9,12 @@ const router = createRouter({
       path: '/',
       redirect: '/portal',
     },
-    // `/login` 路由由 Task 9 在创建 LoginView.vue 时一并注册。
-    // 此处提前引用不存在的组件文件会让本步的 typecheck 失败。
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../../features/auth/views/LoginView.vue'),
+      meta: { public: true },
+    },
     {
       path: '/portal',
       name: 'portal',
