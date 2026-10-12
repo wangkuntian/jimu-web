@@ -127,6 +127,58 @@ describe('refreshAccessToken', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('does not reuse a successful refresh for the next attempt', async () => {
+    saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        code: 0,
+        data: { access_token: 'new', refresh_token: 'refresh-2', expires_in: 1800 },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(refreshAccessToken()).resolves.toBe('new')
+    await expect(refreshAccessToken()).resolves.toBe('new')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  // getRefreshToken 与 saveSession 在 doRefresh 的 try 之外：sessionStorage 抛
+  // SecurityError / QuotaExceededError 时不能把异常漏给调用方，必须仍按契约返回 null。
+  it('resolves null instead of rejecting when reading the refresh token throws', async () => {
+    saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError')
+    })
+
+    try {
+      await expect(refreshAccessToken()).resolves.toBeNull()
+    } finally {
+      getItem.mockRestore()
+    }
+  })
+
+  it('resolves null instead of rejecting when saving the new session throws', async () => {
+    saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          code: 0,
+          data: { access_token: 'new', refresh_token: 'refresh-2', expires_in: 1800 },
+        }),
+      ),
+    )
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+
+    try {
+      await expect(refreshAccessToken()).resolves.toBeNull()
+    } finally {
+      setItem.mockRestore()
+    }
+  })
+
   it('resolves every concurrent caller with the refreshed token', async () => {
     saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
     const fetchMock = vi.fn(
@@ -168,6 +220,24 @@ describe('refreshAccessToken', () => {
       await expect(refreshAccessToken()).resolves.toBeNull()
       expect(hasSession()).toBe(true)
       expect(getAccessToken()).toBe('old')
+    },
+  )
+
+  // 后端 response.OK(c, gin.H{}) 序列化出来正是 {"code":0,"data":{}}：刷新被受理却没有令牌。
+  // 照单保存会写入 undefined 访问令牌，并把刷新令牌覆盖成字符串 "undefined"；它非 null，
+  // hasSession() 于是把用户误判为已登录。载荷是对象却没有令牌串时必须按失效清理会话。
+  it.each(['{"code":0,"data":{}}', '{"code":0,"data":[]}'])(
+    'clears the session when a 2xx body of %s carries no tokens',
+    async (garbage) => {
+      saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(garbage, { status: 200 })),
+      )
+
+      await expect(refreshAccessToken()).resolves.toBeNull()
+      expect(hasSession()).toBe(false)
+      expect(getAccessToken()).toBeNull()
     },
   )
 })

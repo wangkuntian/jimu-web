@@ -110,6 +110,30 @@ describe('retryOnUnauthorizedMiddleware', () => {
     expect(requestCount(requests, '/auth/devices')).toBe(1)
   })
 
+  it('gives up after one replay when the refreshed token is still rejected', async () => {
+    saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const request = toRequest(input)
+        requests.push(request)
+        if (new URL(request.url).pathname.endsWith('/auth/refresh')) {
+          return jsonResponse({
+            code: 0,
+            data: { access_token: 'new', refresh_token: 'refresh-2', expires_in: 1800 },
+          })
+        }
+        return jsonResponse({ code: 1002, message: '未认证' }, 401)
+      }),
+    )
+
+    const result = await api.GET('/auth/devices')
+
+    expect(result.response.status).toBe(401)
+    expect(requestCount(requests, '/auth/devices')).toBe(2)
+    expect(requestCount(requests, '/auth/refresh')).toBe(1)
+  })
+
   it('replays a request that carries a body', async () => {
     saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
     const bodies: string[] = []

@@ -5,7 +5,7 @@ import { clearSession, getRefreshToken, saveSession } from './session'
 
 interface RefreshEnvelope {
   code?: number | undefined
-  data?: TokenPair | undefined
+  data?: unknown
 }
 
 /** 进行中的刷新；并发调用共享它，避免刷新风暴与令牌互相覆盖。 */
@@ -16,12 +16,34 @@ let inflight: Promise<string | null> | null = null
  *
  * 这里刻意使用裸 `fetch` 而不是 openapi-fetch 的 client：刷新请求本身
  * 不能经过 401 重试中间件，否则会递归。
+ *
+ * `doRefresh` 覆盖了预期内的失败；这里的 catch 是最后一道兜底：`getRefreshToken`
+ * 与 `saveSession` 在 `doRefresh` 的 try 之外，`sessionStorage` 抛 SecurityError /
+ * QuotaExceededError 时也必须按契约 resolve null 而不是 reject。
  */
 export function refreshAccessToken(): Promise<string | null> {
-  inflight ??= doRefresh().finally(() => {
-    inflight = null
-  })
+  inflight ??= doRefresh()
+    .catch(() => null)
+    .finally(() => {
+      inflight = null
+    })
   return inflight
+}
+
+/**
+ * 载荷必须是真正含令牌字符串的对象。
+ *
+ * 只判断 `typeof data === 'object'` 会放进 `{}` 与 `[]`：后端 `response.OK(c, gin.H{})`
+ * 序列化出来正是 `{"code":0,"data":{}}`，saveSession 会写入 `undefined` 访问令牌，
+ * 并把刷新令牌覆盖成字符串 `"undefined"`——它非 null，`hasSession()` 因此误判为已登录。
+ */
+function isTokenPair(value: unknown): value is TokenPair {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const payload = value as Record<string, unknown>
+  return typeof payload.access_token === 'string' && typeof payload.refresh_token === 'string'
 }
 
 async function doRefresh(): Promise<string | null> {
@@ -65,12 +87,22 @@ async function doRefresh(): Promise<string | null> {
     return null
   }
 
+  const data: unknown = body.data
+
   // code 为 0 说明刷新已被受理，但载荷不是对象（undefined / null / 数字）时取不出令牌。
   // 这属于服务端异常，不构成「refresh token 已失效」的证据，按既有原则不清理会话。
-  if (body.data === undefined || body.data === null || typeof body.data !== 'object') {
+  if (data === undefined || data === null || typeof data !== 'object') {
     return null
   }
 
-  saveSession(body.data)
-  return body.data.access_token
+  // 载荷是对象却不含令牌字符串：刷新已被受理却没有可用令牌（`{"code":0,"data":{}}`）。
+  // 绝不能调用 saveSession——它会把访问令牌写成 undefined、刷新令牌覆盖成 "undefined"，
+  // 让 hasSession() 把用户误判为已登录。会话已无法恢复，按失效清理。
+  if (!isTokenPair(data)) {
+    clearSession()
+    return null
+  }
+
+  saveSession(data)
+  return data.access_token
 }
