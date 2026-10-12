@@ -1626,7 +1626,15 @@ export function resolveSessionNavigation(to: GuardTarget): SessionNavigation {
   return true
 }
 
-export const sessionGuard: NavigationGuard = (to) => resolveSessionNavigation(to)
+// 注意（实施后修正）：不能直接把 `to` 传给纯函数。vue-router 的 RouteMeta 是
+// Record<string | number | symbol, unknown>，赋给 `{ public?: boolean }` 会报
+// TS2345 并使本步的 vue-tsc 失败，必须显式映射字段。
+export const sessionGuard: NavigationGuard = (to) =>
+  resolveSessionNavigation({
+    path: to.path,
+    fullPath: to.fullPath,
+    meta: { public: to.meta.public === true },
+  })
 ```
 
 - [ ] **Step 4: 运行测试确认通过**
@@ -1652,6 +1660,9 @@ const router = createRouter({
     },
     // `/login` 路由由 Task 9 在创建 LoginView.vue 时一并注册。
     // 此处提前引用不存在的组件文件会让本步的 typecheck 失败。
+    // 代价（已实测）：在 Task 9 落地前，匿名访问 /portal 会无界重定向
+    // （守卫跳 /login → 无匹配路由 → 再次进入守卫，redirect= 查询串不断增长），
+    // 因此 Task 9 必须紧接着完成，且 /login 必须带 meta: { public: true }。
     {
       path: '/portal',
       name: 'portal',
