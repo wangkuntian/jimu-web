@@ -44,11 +44,39 @@ export function saveSession(tokens: TokenPair): void {
  *
  * 设备令牌代表「记住此设备」，跨登出保留；只有全设备登出（logout-all）时才用
  * clearDeviceToken 一并清除，因为后端此时已吊销全部可信设备。
+ *
+ * 主动登出已经自行导航，所以这里不通知订阅者；会话被服务端拒绝时用 expireSession。
  */
 export function clearSession(): void {
   accessToken = null
   expiresAt = 0
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+}
+
+type SessionExpiredHandler = () => void
+
+/** 会话失效订阅者；刷新被拒时逐个通知，由路由装配处用于跳转登录页。 */
+const sessionExpiredHandlers = new Set<SessionExpiredHandler>()
+
+/** 订阅「会话被服务端拒绝」事件，返回取消订阅函数。 */
+export function onSessionExpired(handler: SessionExpiredHandler): () => void {
+  sessionExpiredHandlers.add(handler)
+  return () => {
+    sessionExpiredHandlers.delete(handler)
+  }
+}
+
+/**
+ * 会话被服务端拒绝（刷新失败）时清理会话并通知订阅者。
+ *
+ * 与 `clearSession()` 的分工：主动登出已自行导航，必须用 `clearSession()` 避免二次跳转；
+ * 只有刷新失败这类「会话已失效」的路径才用本函数。
+ */
+export function expireSession(): void {
+  clearSession()
+  for (const handler of sessionExpiredHandlers) {
+    handler()
+  }
 }
 
 export function clearDeviceToken(): void {

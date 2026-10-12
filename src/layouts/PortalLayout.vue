@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 
+import { LOGIN_ROUTE } from '../app/guards/session'
 import { logout } from '../features/auth/api'
 
 const router = useRouter()
@@ -9,7 +10,7 @@ async function onLogout(): Promise<void> {
   try {
     await logout()
   } finally {
-    await router.push('/login')
+    await router.push(LOGIN_ROUTE)
   }
 }
 </script>

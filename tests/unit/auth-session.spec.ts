@@ -1,13 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   clearDeviceToken,
   clearSession,
+  expireSession,
   getAccessToken,
   getDeviceToken,
   getRefreshToken,
   hasSession,
   isAccessTokenExpiring,
+  onSessionExpired,
   saveSession,
 } from '../../src/shared/auth/session'
 
@@ -68,5 +70,31 @@ describe('auth session', () => {
 
     saveSession({ ...tokens, expires_in: 3600 })
     expect(isAccessTokenExpiring()).toBe(false)
+  })
+
+  it('notifies expiry subscribers only when the session was rejected', () => {
+    const handler = vi.fn()
+    const unsubscribe = onSessionExpired(handler)
+
+    try {
+      // 主动登出：只清会话，不通知，避免与 PortalLayout 自己的跳转重复。
+      saveSession(tokens)
+      clearSession()
+      expect(handler).not.toHaveBeenCalled()
+
+      // 刷新被拒：清理并通知一次。
+      saveSession(tokens)
+      expireSession()
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(hasSession()).toBe(false)
+
+      // 退订后不再收到通知。
+      unsubscribe()
+      saveSession(tokens)
+      expireSession()
+      expect(handler).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+    }
   })
 })

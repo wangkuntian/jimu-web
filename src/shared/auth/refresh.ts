@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../api/config'
 import type { TokenPair } from '../api/types'
 import { ErrorCode } from '../api/unwrap'
-import { clearSession, getRefreshToken, saveSession } from './session'
+import { expireSession, getRefreshToken, saveSession } from './session'
 
 interface RefreshEnvelope {
   code?: number | undefined
@@ -65,7 +65,7 @@ async function doRefresh(): Promise<string | null> {
   }
 
   if (!response.ok) {
-    clearSession()
+    expireSession()
     return null
   }
 
@@ -83,7 +83,7 @@ async function doRefresh(): Promise<string | null> {
   }
 
   if (body.code !== ErrorCode.ok) {
-    clearSession()
+    expireSession()
     return null
   }
 
@@ -99,7 +99,7 @@ async function doRefresh(): Promise<string | null> {
   // 绝不能调用 saveSession——它会把访问令牌写成 undefined、刷新令牌覆盖成 "undefined"，
   // 让 hasSession() 把用户误判为已登录。会话已无法恢复，按失效清理。
   if (!isTokenPair(data)) {
-    clearSession()
+    expireSession()
     return null
   }
 
