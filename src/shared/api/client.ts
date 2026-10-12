@@ -1,7 +1,8 @@
 import createClient from 'openapi-fetch'
 import type { Middleware } from 'openapi-fetch'
 
-import { getAccessToken, getDeviceToken } from '../auth/session'
+import { refreshAccessToken } from '../auth/refresh'
+import { getAccessToken, getDeviceToken, hasSession, isAccessTokenExpiring } from '../auth/session'
 import { API_BASE_URL } from './config'
 import type { paths } from './generated'
 
@@ -45,3 +46,47 @@ export const requestContextMiddleware: Middleware = {
 }
 
 api.use(requestContextMiddleware)
+
+/**
+ * 请求副本缓存。
+ *
+ * `fetch(request)` 会消费请求体，之后再 `request.clone()` 会抛
+ * `TypeError: unusable`，因此必须在发出前留一份副本。
+ */
+const replayable = new WeakMap<Request, Request>()
+
+/** 401 时刷新令牌并重放一次原请求。 */
+export const retryOnUnauthorizedMiddleware: Middleware = {
+  async onRequest({ request }) {
+    // 主动预刷新：令牌即将到期时先换新，避免把必然失败的请求发出去。
+    // 刷新失败不在这里中断，仍交由下面的 401 分支决定后续处理。
+    if (hasSession() && isAccessTokenExpiring()) {
+      const token = await refreshAccessToken()
+      if (token !== null) {
+        request.headers.set('Authorization', `Bearer ${token}`)
+      }
+    }
+
+    // 副本必须在请求发出前留存（此时请求体尚未被消费）。
+    replayable.set(request, request.clone())
+    return request
+  },
+  async onResponse({ request, response }) {
+    if (response.status !== 401) {
+      return response
+    }
+
+    const token = await refreshAccessToken()
+    const replay = replayable.get(request)
+    if (token === null || replay === undefined) {
+      return response
+    }
+
+    // 显式设置新令牌，不依赖克隆时可能已过期的旧值。
+    replay.headers.set('Authorization', `Bearer ${token}`)
+    // 用裸 fetch 重放，避免再次进入中间件造成递归。
+    return fetch(replay)
+  },
+}
+
+api.use(retryOnUnauthorizedMiddleware)
