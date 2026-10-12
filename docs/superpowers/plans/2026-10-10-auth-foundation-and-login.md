@@ -801,6 +801,15 @@ git commit -m "feat(auth): add single-flight token refresh"
 
 创建 `tests/unit/api-retry.spec.ts`：
 
+> **注意（实施后修正）：** 本任务的 fetch stub 必须同时接受 `Request` 与 URL 字符串。openapi-fetch 传给 `fetch` 的是 `Request`，而 `refreshAccessToken`（Task 4）用裸 `fetch` 传的是 `${API_BASE_URL}/auth/refresh` 模板字符串（`refresh.ts:35`）。若 stub 直接访问 `input.url`，字符串入参下会得到 `undefined`，`new URL(undefined)` 抛 `Invalid URL` 并被 refresh 的 try/catch 吞掉，表现为「刷新静默失败」。因此每个 stub 的首行需用下面的 `toRequest` 先归一化（四处 stub 都要加）：
+
+```ts
+/** 归一化 fetch 入参：openapi-fetch 传 Request，refresh.ts 传 URL 字符串。 */
+function toRequest(input: RequestInfo | URL, init?: RequestInit): Request {
+  return input instanceof Request ? input : new Request(input, init)
+}
+```
+
 ```ts
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -828,9 +837,10 @@ describe('retryOnUnauthorizedMiddleware', () => {
     saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: Request) => {
-        requests.push(input)
-        const url = new URL(input.url)
+      vi.fn(async (input: RequestInfo | URL) => {
+        const request = toRequest(input)
+        requests.push(request)
+        const url = new URL(request.url)
         if (url.pathname.endsWith('/auth/refresh')) {
           return jsonResponse({
             code: 0,
@@ -860,9 +870,10 @@ describe('retryOnUnauthorizedMiddleware', () => {
     const paths: string[] = []
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: Request) => {
-        requests.push(input)
-        const path = new URL(input.url).pathname
+      vi.fn(async (input: RequestInfo | URL) => {
+        const request = toRequest(input)
+        requests.push(request)
+        const path = new URL(request.url).pathname
         paths.push(path)
         if (path.endsWith('/auth/refresh')) {
           return jsonResponse({
@@ -887,9 +898,10 @@ describe('retryOnUnauthorizedMiddleware', () => {
     saveSession({ access_token: 'old', refresh_token: 'refresh-1', expires_in: 1800 })
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: Request) => {
-        requests.push(input)
-        if (new URL(input.url).pathname.endsWith('/auth/refresh')) {
+      vi.fn(async (input: RequestInfo | URL) => {
+        const request = toRequest(input)
+        requests.push(request)
+        if (new URL(request.url).pathname.endsWith('/auth/refresh')) {
           return jsonResponse({ code: 1002, message: '未认证' }, 401)
         }
         return jsonResponse({ code: 1002, message: '未认证' }, 401)
@@ -907,16 +919,17 @@ describe('retryOnUnauthorizedMiddleware', () => {
     const bodies: string[] = []
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: Request) => {
-        requests.push(input)
-        const url = new URL(input.url)
+      vi.fn(async (input: RequestInfo | URL) => {
+        const request = toRequest(input)
+        requests.push(request)
+        const url = new URL(request.url)
         if (url.pathname.endsWith('/auth/refresh')) {
           return jsonResponse({
             code: 0,
             data: { access_token: 'new', refresh_token: 'refresh-2', expires_in: 1800 },
           })
         }
-        bodies.push(await input.clone().text())
+        bodies.push(await request.clone().text())
         if (bodies.length === 1) {
           return jsonResponse({ code: 1002, message: '未认证' }, 401)
         }
