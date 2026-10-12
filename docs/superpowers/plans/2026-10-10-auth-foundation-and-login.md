@@ -195,7 +195,7 @@ export function unwrap<T>(body: Envelope | undefined): T {
 - [ ] **Step 6: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/api-unwrap.spec.ts`
-预期：PASS，5 个用例通过。
+预期：PASS。
 
 - [ ] **Step 7: 检查点**
 
@@ -382,7 +382,7 @@ export function clearDeviceToken(): void {
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/auth-session.spec.ts`
-预期：PASS，5 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 检查点**
 
@@ -561,7 +561,7 @@ import { getAccessToken, getDeviceToken } from '../auth/session'
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/api-client.spec.ts`
-预期：PASS，4 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 检查点**
 
@@ -766,7 +766,7 @@ async function doRefresh(): Promise<string | null> {
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/auth-refresh.spec.ts`
-预期：PASS，5 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 检查点**
 
@@ -780,6 +780,8 @@ pnpm run typecheck && pnpm run lint
 git add src/shared/auth/refresh.ts tests/unit/auth-refresh.spec.ts
 git commit -m "feat(auth): add single-flight token refresh"
 ```
+
+> **注意（实施后修正）：** 整分支复盘要求交付代码与本节的实现有两处不同。一是 2xx 载荷的守卫从「`data` 是对象」收紧为「`data` 含字符串 `access_token` 与 `refresh_token`」，否则 `{"code":0,"data":{}}`（后端 `response.OK(c, gin.H{})` 的序列化结果）会写入 `undefined` 访问令牌并把刷新令牌覆盖成字符串 `"undefined"`，让 `hasSession()` 把用户误判为已登录；载荷是对象却没有令牌串时按失效清理会话。二是 `refreshAccessToken` 对 `doRefresh()` 追加了非拒绝兜底：`getRefreshToken` / `saveSession` 在 `try` 之外，`sessionStorage` 抛 SecurityError / QuotaExceededError 时必须按契约 resolve `null` 而不是把异常漏给调用方。见 `src/shared/auth/refresh.ts` 与 `tests/unit/auth-refresh.spec.ts`。
 
 ---
 
@@ -1016,7 +1018,7 @@ import { getAccessToken, getDeviceToken, hasSession, isAccessTokenExpiring } fro
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/api-retry.spec.ts`
-预期：PASS，4 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 回归既有测试**
 
@@ -1228,7 +1230,7 @@ export async function logoutAll(): Promise<void> {
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/auth-api.spec.ts`
-预期：PASS，6 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 检查点**
 
@@ -1242,6 +1244,8 @@ pnpm run typecheck && pnpm run lint
 git add src/features/auth/api.ts tests/unit/auth-api.spec.ts
 git commit -m "feat(auth): wrap the login, captcha and logout endpoints"
 ```
+
+> **注意（实施后修正）：** 整分支复盘要求交付代码把本地 `clearSession()` 移入 `finally`（`logoutAll` 还包含 `clearDeviceToken()`），使登出请求本身失败时本地会话仍被清理；本节实现把清理写在请求之后，请求抛错时会留下一个「服务端已登出、前端仍以为已登录」的会话。见 `src/features/auth/api.ts` 与 `tests/unit/auth-api.spec.ts` 的「clears the session even when the logout request rejects」。
 
 ---
 
@@ -1465,7 +1469,7 @@ import { RouterView } from 'vue-router'
 - [ ] **Step 6: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/layouts.spec.ts`
-预期：PASS，2 个用例通过。
+预期：PASS。
 
 - [ ] **Step 7: 回归全部单测与既有 E2E**
 
@@ -1640,7 +1644,7 @@ export const sessionGuard: NavigationGuard = (to) =>
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `pnpm exec vitest run tests/unit/session-guard.spec.ts`
-预期：PASS，4 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 更新路由表**
 
@@ -1695,7 +1699,7 @@ export default router
 
 守卫的 `LOGIN_ROUTE` 常量在本步已定义，Task 9 复用它注册路由。
 
-## - [ ] **Step 6: 补 E2E 会话播种助手并更新既有用例**
+- [ ] **Step 6: 补 E2E 会话播种助手并更新既有用例**
 
 创建 `e2e/helpers/session.ts`：
 
@@ -1981,7 +1985,7 @@ async function handleError(error: unknown): Promise<void> {
 - [ ] **Step 4: 运行单测确认通过**
 
 Run: `pnpm exec vitest run tests/unit/login-view.spec.ts`
-预期：PASS，2 个用例通过。
+预期：PASS。
 
 - [ ] **Step 5: 注册 `/login` 路由**
 
@@ -2095,6 +2099,8 @@ git add src/features/auth/views/LoginView.vue src/app/router/index.ts tests/unit
 git commit -m "feat(auth): add the login page with reactive captcha and totp"
 ```
 
+> **注意（实施后修正）：** 整分支复盘要求交付代码把验证码加载 `tryLoadCaptcha()` 写成非抛出：内部 `try/catch` 后返回布尔值，失败时显示「验证码加载失败，请重试」；本节实现直接 `await fetchCaptcha()`，失败会逃逸成未处理的拒绝而不是可见错误。见 `src/features/auth/views/LoginView.vue` 与 `tests/unit/login-view.spec.ts` 的「keeps a failed captcha load visible and retryable」。
+
 ---
 
 ### Task 10: 版本日志与目录约定同步
@@ -2146,6 +2152,8 @@ git commit -m "feat(auth): add the login page with reactive captcha and totp"
 ```markdown
 - Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示。
 ```
+
+> **注意（实施后修正）：** 整分支复盘又改动了 README 与版本日志，交付内容与本节的文本不同：README 删除了 `src/stores/` 目录条目（该占位 store 零引用已删除）、`features/` 描述收敛为实际交付的「登录页与认证 API 封装」、并把「Vitest 当前验证产品名称和工作区入口」改为当前覆盖范围；`docs/releases/v0.2.0.md` 另加一行「本期未交付」，说明账号安全子页与注册、找回 / 重置密码属计划二、计划三。以仓库中的两个文件为准。
 
 - [ ] **Step 3: 检查点**
 
