@@ -127,7 +127,7 @@ jimu-web/
 ├── scripts/            # 提交消息与聚合门禁校验脚本
 ├── src/
 │   ├── app/             # 应用路由与守卫
-│   ├── features/        # 按用户能力组织的功能（auth：登录与账号安全）
+│   ├── features/        # 按用户能力组织的功能（auth：登录页与认证 API 封装）
 │   ├── layouts/         # AuthLayout 与 PortalLayout
 │   ├── shared/api/      # 生成的 API 类型、client、信封解包与载荷视图模型
 │   ├── shared/auth/     # 会话存储与刷新
@@ -140,7 +140,7 @@ jimu-web/
 
 ## 验证方式
 
-- Vitest 当前验证产品名称和工作区入口。
+- Vitest 覆盖信封解包、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、登录页错误码分支、应用外壳与布局渲染。
 - Playwright 当前验证 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
 - Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示。
 - 租户范围和无权限访问测试将在对应功能实现时补充。
