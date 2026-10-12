@@ -91,4 +91,49 @@ describe('LoginView', () => {
     expect(wrapper.find('.captcha-image').attributes('src')).toBe('data:image/png;base64,AA')
     expect(errors).toHaveLength(0)
   })
+
+  it('resubmits the login with the typed totp code when mfa is required', async () => {
+    vi.mocked(login)
+      .mockRejectedValueOnce(new ApiError(ErrorCode.mfaRequired, '需要 TOTP 验证码'))
+      .mockResolvedValueOnce({ access_token: 'a1', refresh_token: 'r1', expires_in: 1800 })
+
+    const wrapper = mountLogin()
+
+    await wrapper.find('input[autocomplete="username"]').setValue('alice')
+    await wrapper.find('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="totp"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="totp"] input').setValue('654321')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    // 断言真实调用参数：删掉 totp_code 的发送会让本用例失败。
+    expect(vi.mocked(login)).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(login).mock.calls[1]![0]).toMatchObject({
+      username: 'alice',
+      password: 'secret123',
+      totp_code: '654321',
+    })
+  })
+
+  it('reports an invalid totp code and keeps the field available', async () => {
+    vi.mocked(login)
+      .mockRejectedValueOnce(new ApiError(ErrorCode.mfaRequired, '需要 TOTP 验证码'))
+      .mockRejectedValueOnce(new ApiError(ErrorCode.invalidMfa, '验证码无效'))
+
+    const wrapper = mountLogin()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    await wrapper.find('[data-test="totp"] input').setValue('000000')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('验证码无效，请重新输入')
+    expect(wrapper.find('[data-test="totp"]').exists()).toBe(true)
+  })
 })
