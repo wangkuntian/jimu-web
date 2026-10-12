@@ -18,3 +18,7 @@ test-results/
 !.vscode/extensions.json
 !.vscode/settings.json
 *.swp
+
+.agents/
+# SDD（subagent-driven-development）工作区：ledger、brief、review package 等过程产物
+.superpowers/
