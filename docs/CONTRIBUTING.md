@@ -23,11 +23,21 @@ pnpm run dev             # http://localhost:5173，/api 代理到本地后端
 - `feature/<issue>-<slug>` — 新功能
 - `fix/<issue>-<slug>` — 缺陷修复
 - `hotfix/<issue>-<slug>` — 线上紧急修复
+- `release/<version>` — 发布集成分支，短期存在，见下
 - `dependabot/*` — 自动化分支，人工不得基于它开发
 
-分支名小写，单词用短横线，`slug` 不超过 5 个单词；`<issue>` 段鼓励填写（有 issue 时写成 `feature/123-<slug>`），没有 issue 时省略。CI、工具链、模板等仓库级改动同样走 `feature/`，与后端 `feature/ci-pipeline` 的用法一致；后端定义的 `release/*`、`dependency-updates` 两个长期分支在本仓不存在。
+分支名小写，单词用短横线，`slug` 不超过 5 个单词；`<issue>` 段鼓励填写（有 issue 时写成 `feature/123-<slug>`），没有 issue 时省略。CI、工具链、模板等仓库级改动同样走 `feature/`，与后端 `feature/ci-pipeline` 的用法一致。
 
-与后端 `jimu` 的差异：本仓没有 `release/*` 集成分支与常驻 `dependency-updates` 分支。发布直接在 `master` tip 打 tag；依赖更新由 dependabot 面向 `master` 开 PR（见下）。
+与后端 `jimu` 的差异：本仓没有常驻的 `dependency-updates` 分支（依赖更新由 dependabot 面向 `master` 开 PR）；后端那种长期存在的 `release/*` 集成分支在本仓也不存在。
+
+### release/<version> 分支
+
+一个版本的工作跨多个 PR 时，用一条 `release/<version>` 分支做集成，版本内容在其中汇总后再一次性合入 `master`：
+
+- 分支名取目标版本号，如 `release/v0.2.0`，与 `docs/releases/<version>.md` 的版本号一致。
+- 它是**短期集成分支**，不是长期分支：版本发布后删除，不长期驻留。
+- 各任务的提交先落在这条分支上；需要独立 review 的改动仍可另开 `feature/` 分支再并入本分支。
+- 它不改变发布链路：**tag 仍然只能打在 `master` tip**（`release.yml` 的 `Verify Tag` 会校验），因此流程是「`release/<version>` 合入 `master` → 在 `master` tip 打 tag」。不要在该分支上打 tag。
 
 ## Commit 规范
 
@@ -94,6 +104,7 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 ## Tag 与发布
 
 - 发布在 `master` tip 打 `vMAJOR.MINOR.PATCH` tag（SemVer，无预发布标签）
+- 若本版本走了 `release/<version>` 集成分支，顺序是：该分支合入 `master` → 确认 `master` tip 通过 `CI Gate` → 在 `master` tip 打 tag；**不在集成分支上打 tag**
 - `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`pnpm run build`、打包 `jimu-portal-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
 - 发布产物是静态资源包，解压后的内容即站点根目录，由 Nginx/CDN 等静态托管
 - 回滚：`master` 不允许强推，用 revert commit 走正常 PR；已发布的 tag 不重打，改版本号重新发布
