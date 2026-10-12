@@ -126,10 +126,13 @@ jimu-web/
 ├── githooks/           # commit-msg 提交消息钩子
 ├── scripts/            # 提交消息与聚合门禁校验脚本
 ├── src/
-│   ├── app/             # 应用路由
-│   ├── shared/api/      # 生成的 API 类型
+│   ├── app/             # 应用路由与守卫
+│   ├── features/        # 按用户能力组织的功能（auth：登录与账号安全）
+│   ├── layouts/         # AuthLayout 与 PortalLayout
+│   ├── shared/api/      # 生成的 API 类型、client、信封解包与载荷视图模型
+│   ├── shared/auth/     # 会话存储与刷新
 │   ├── stores/          # Pinia 状态
-│   ├── styles/          # 全局样式
+│   ├── styles/          # 全局样式与设计 token
 │   └── views/           # 当前静态壳页面
 ├── tests/               # Vitest 单元测试
 ├── DESIGN.md            # 设计规范（编码 agent 读取）
@@ -140,6 +143,7 @@ jimu-web/
 
 - Vitest 当前验证产品名称和工作区入口。
 - Playwright 当前验证 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
+- Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示。
 - 登录、会话刷新、租户范围和无权限访问测试将在对应功能实现时补充。
 - `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
