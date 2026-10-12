@@ -26,14 +26,20 @@ export async function login(payload: LoginPayload): Promise<TokenPair> {
 }
 
 export async function logout(): Promise<void> {
-  const { data } = await api.POST('/auth/logout')
-  clearSession()
-  unwrap<unknown>(data)
+  try {
+    const { data } = await api.POST('/auth/logout')
+    unwrap<unknown>(data)
+  } finally {
+    clearSession()
+  }
 }
 
 export async function logoutAll(): Promise<void> {
-  const { data } = await api.POST('/auth/logout-all')
-  clearSession()
-  clearDeviceToken()
-  unwrap<unknown>(data)
+  try {
+    const { data } = await api.POST('/auth/logout-all')
+    unwrap<unknown>(data)
+  } finally {
+    clearSession()
+    clearDeviceToken()
+  }
 }

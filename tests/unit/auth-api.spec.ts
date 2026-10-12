@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchCaptcha, login, logoutAll } from '../../src/features/auth/api'
-import { clearSession, getAccessToken, getDeviceToken } from '../../src/shared/auth/session'
+import { fetchCaptcha, login, logout, logoutAll } from '../../src/features/auth/api'
+import {
+  clearSession,
+  getAccessToken,
+  getDeviceToken,
+  hasSession,
+  saveSession,
+} from '../../src/shared/auth/session'
 import { ApiError } from '../../src/shared/api/unwrap'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -109,5 +115,36 @@ describe('auth api', () => {
     )
 
     await expect(login({ username: 'alice', password: 'bad' })).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('clears the session on logout but keeps the device token', async () => {
+    saveSession({
+      access_token: 'a1',
+      refresh_token: 'r1',
+      expires_in: 1800,
+      device_token: 'device-1',
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ code: 0, data: {} })),
+    )
+
+    await logout()
+
+    expect(hasSession()).toBe(false)
+    expect(getDeviceToken()).toBe('device-1')
+  })
+
+  it('clears the session even when the logout request rejects', async () => {
+    saveSession({ access_token: 'a1', refresh_token: 'r1', expires_in: 1800 })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    await expect(logout()).rejects.toBeInstanceOf(TypeError)
+    expect(hasSession()).toBe(false)
   })
 })
