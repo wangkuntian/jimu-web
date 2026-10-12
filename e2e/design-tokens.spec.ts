@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test'
 
+import { seedSession } from './helpers/session'
+
 /**
  * 验证 Carbon 设计 token 已生效，见
  * docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md
  */
 test('applies the Carbon design tokens over Element Plus', async ({ page }) => {
+  await seedSession(page)
   await page.goto('/portal')
 
   const tokens = await page.evaluate(() => {
@@ -36,6 +39,7 @@ test('applies the Carbon design tokens over Element Plus', async ({ page }) => {
 })
 
 test('renders the shell with Carbon tokens', async ({ page }) => {
+  await seedSession(page)
   await page.goto('/portal')
 
   await expect(page.locator('.brand')).toHaveCSS('color', 'rgb(15, 98, 254)')
