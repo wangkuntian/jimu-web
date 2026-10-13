@@ -1,14 +1,87 @@
 :root {
-  color: #1f2933;
-  background: #f5f7fa;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  /*
+   * 设计 token。来源与决策见
+   * docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md
+   *
+   * --el-* 覆盖依赖 main.ts 中 element-plus/dist/index.css 先于本文件引入。
+   * 派生色阶 light-3/5/7/8/9、dark-2 与 Element Plus 的 mix(白或黑, 主色, N) 一致；
+   * 改动 --jp-color-accent 时必须按同一规则重算这些派生值。
+   */
+
+  /* 字体。IBM Plex Sans 尚未随包引入，未安装时回落到系统中文字体。 */
+  --jp-font-sans:
+    'IBM Plex Sans', 'IBM Plex Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * 字号层级，取值见 DESIGN.md 第 3 节：说明文字 / 正文 / 小节标题 / 区块标题 / 页面标题。
+   * 字重上限 600，需要强调时用 --jp-font-weight-emphasis，不再写裸字号与裸字重。
+   */
+  --jp-font-size-caption: 12px;
+  --jp-font-size-body: 14px;
+  --jp-font-size-subtitle: 16px;
+  --jp-font-size-title: 20px;
+  --jp-font-size-display: 24px;
+  --jp-font-weight-emphasis: 600;
+
+  /* 本项目语义色 */
+  --jp-color-text: #161616;
+  --jp-color-text-muted: #525252;
+  --jp-color-surface: #ffffff;
+  --jp-color-app-bg: #f4f4f4;
+  --jp-color-hairline: #e0e0e0;
+  --jp-color-accent: #0f62fe;
+  --jp-color-accent-subtle: var(--el-color-primary-light-9);
+  --jp-color-accent-border: var(--el-color-primary-light-7);
+  --jp-radius-control: 4px;
+
+  /* Element Plus 主色与派生色阶 */
+  --el-color-primary: var(--jp-color-accent);
+  --el-color-primary-rgb: 15, 98, 254;
+  --el-color-primary-light-3: #5791fe;
+  --el-color-primary-light-5: #87b1ff;
+  --el-color-primary-light-7: #b7d0ff;
+  --el-color-primary-light-8: #cfe0ff;
+  --el-color-primary-light-9: #e7efff;
+  --el-color-primary-dark-2: #0c4ecb;
+
+  /* Element Plus 语义色与派生色阶 */
+  --el-color-success: #24a148;
+  --el-color-success-rgb: 36, 161, 72;
+  --el-color-success-light-3: #66bd7f;
+  --el-color-success-light-5: #92d0a4;
+  --el-color-success-light-7: #bde3c8;
+  --el-color-success-light-8: #d3ecda;
+  --el-color-success-light-9: #e9f6ed;
+  --el-color-success-dark-2: #1d813a;
+  --el-color-warning: #f1c21b;
+  --el-color-warning-rgb: 241, 194, 27;
+  --el-color-warning-light-3: #f5d45f;
+  --el-color-warning-light-5: #f8e18d;
+  --el-color-warning-light-7: #fbedbb;
+  --el-color-warning-light-8: #fcf3d1;
+  --el-color-warning-light-9: #fef9e8;
+  --el-color-warning-dark-2: #c19b16;
+  --el-color-danger: #da1e28;
+  --el-color-danger-rgb: 218, 30, 40;
+  --el-color-danger-light-3: #e56269;
+  --el-color-danger-light-5: #ed8f94;
+  --el-color-danger-light-7: #f4bcbf;
+  --el-color-danger-light-8: #f8d2d4;
+  --el-color-danger-light-9: #fbe9ea;
+  --el-color-danger-dark-2: #ae1820;
+
+  /* Element Plus 中性色 */
+  --el-fill-color-light: #f4f4f4;
+  --el-border-color-light: #e0e0e0;
+  --el-text-color-primary: var(--jp-color-text);
+  --el-text-color-regular: var(--jp-color-text-muted);
+  --el-text-color-secondary: #8c8c8c;
+  --el-font-family: var(--jp-font-sans);
+
+  color: var(--jp-color-text);
+  background: var(--jp-color-app-bg);
+  font-family: var(--jp-font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -27,58 +100,13 @@ a {
   color: inherit;
 }
 
-.app-shell {
-  min-height: 100vh;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2rem;
-  min-height: 64px;
-  padding: 0 32px;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.brand {
-  color: #0f766e;
-  font-size: 1.05rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.primary-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  color: #52606d;
-  font-size: 0.925rem;
-}
-
-.primary-nav a {
-  text-decoration: none;
-}
-
-.primary-nav a.router-link-active,
-.primary-nav a:hover {
-  color: #0f766e;
-}
-
-.app-main {
-  width: min(100% - 48px, 1120px);
-  margin: 0 auto;
-  padding: 72px 0;
-}
-
 .page-section {
   max-width: 720px;
 }
 
 .eyebrow {
   margin: 0 0 12px;
-  color: #0f766e;
+  color: var(--jp-color-accent);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -87,14 +115,14 @@ a {
 
 h1 {
   margin: 0;
-  color: #102a43;
+  color: var(--jp-color-text);
   font-size: clamp(2rem, 5vw, 3.5rem);
   line-height: 1.1;
 }
 
 .page-lead,
 .page-note {
-  color: #52606d;
+  color: var(--jp-color-text-muted);
   font-size: 1.05rem;
   line-height: 1.7;
 }
@@ -120,26 +148,12 @@ h1 {
   align-items: center;
   min-height: 40px;
   padding: 0 16px;
-  color: #0f766e;
-  border: 1px solid #99d5cf;
-  border-radius: 6px;
+  color: var(--jp-color-accent);
+  border: 1px solid var(--jp-color-accent-border);
+  border-radius: var(--jp-radius-control);
   text-decoration: none;
 }
 
 .workspace-link:hover {
-  background: #e6fffa;
-}
-
-@media (max-width: 640px) {
-  .app-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 24px;
-  }
-
-  .app-main {
-    width: min(100% - 32px, 1120px);
-    padding: 48px 0;
-  }
+  background: var(--jp-color-accent-subtle);
 }

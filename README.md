@@ -4,7 +4,7 @@
 
 Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管理员、租户管理员和普通业务用户提供统一入口。
 
-当前 Bootstrap 仅建立 Vue 3 SPA、三个静态工作区入口和工程质量工具；平台与租户管理能力尚未接入后端。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
+当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新和路由守卫已接入真实后端；平台与租户管理能力尚未实现。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
 
 ## 仓库边界
 
@@ -89,8 +89,9 @@ pnpm run api:types
 ## 当前 Bootstrap 范围
 
 - `/` 重定向到 `/portal`。
-- `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面。
-- Pinia 会话 store 只定义前端状态边界，不假设后端登录行为。
+- `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面；三者均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
+- 会话状态由 `src/shared/auth/session.ts` 的模块级变量承载：访问令牌只驻留内存，刷新令牌存 `sessionStorage`，不落盘，也不依赖 Pinia。
+- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；登录页已使用其表单、输入框、按钮与提示组件。
 - API 契约转换、类型生成、格式化、lint、类型检查、单测、E2E 和构建均有独立 CLI。
 
 ## 后续首版目标
@@ -125,20 +126,24 @@ jimu-web/
 ├── githooks/           # commit-msg 提交消息钩子
 ├── scripts/            # 提交消息与聚合门禁校验脚本
 ├── src/
-│   ├── app/             # 应用路由
-│   ├── shared/api/      # 生成的 API 类型
-│   ├── stores/          # Pinia 状态
-│   ├── styles/          # 全局样式
+│   ├── app/             # 应用路由与守卫
+│   ├── features/        # 按用户能力组织的功能（auth：登录页与认证 API 封装）
+│   ├── layouts/         # AuthLayout 与 PortalLayout
+│   ├── shared/api/      # 生成的 API 类型、client、信封解包与载荷视图模型
+│   ├── shared/auth/     # 会话存储与刷新
+│   ├── styles/          # 全局样式与设计 token
 │   └── views/           # 当前静态壳页面
 ├── tests/               # Vitest 单元测试
+├── DESIGN.md            # 设计规范（编码 agent 读取）
 └── package.json
 ```
 
 ## 验证方式
 
-- Vitest 当前验证产品名称和工作区入口。
-- Playwright 当前验证 `/portal` 页面标题和平台工作区标题。
-- 登录、会话刷新、租户范围和无权限访问测试将在对应功能实现时补充。
+- Vitest 覆盖信封解包、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、登录页错误码分支、应用外壳与布局渲染。
+- Playwright 当前验证 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
+- Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示。
+- 租户范围和无权限访问测试将在对应功能实现时补充。
 - `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
 ## 相关文档
@@ -146,4 +151,6 @@ jimu-web/
 - [贡献指南](docs/CONTRIBUTING.md)：分支、提交消息、PR、CI 与发布流程
 - [版本日志 v0.1.0](docs/releases/v0.1.0.md)
 - [Jimu Portal 前端设计](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)
+- [设计规范 DESIGN.md](DESIGN.md)
+- [设计系统来源与 UI 规范](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)
 - [初始化实现计划](docs/superpowers/plans/2026-09-20-jimu-web-bootstrap.md)

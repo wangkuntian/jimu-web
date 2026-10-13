@@ -21,6 +21,7 @@
 ## 开发前必读
 
 - 项目定位、技术栈、CLI 命令、目录结构和 OpenAPI 流程见 [README.md](README.md)；前端设计方向见 [Jimu Portal 前端设计](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)。
+- 设计 token、色板来源与 UI 规范见 [DESIGN.md](DESIGN.md)；选型理由与被否决的候选见[设计系统来源与 UI 规范](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)。
 - 分支、PR、CI、发布与版本日志流程见 [贡献指南](docs/CONTRIBUTING.md)；首次克隆后运行 `pnpm run hooks:install` 启用 commit-msg 钩子。
 - 修改代码、脚本或目录约定后，必须同步更新 README.md 对应章节。
 - 分支名沿用后端约定：`feature/<issue>-<slug>`，全小写短横线格式；`master` 有分支保护（`protect master`），只能经 PR 合入。
@@ -34,6 +35,15 @@
 - 按用户能力组织界面：具体业务域确定后再建 `src/features/<domain>/`；`src/shared/` 只放确实被多个能力复用的内容。
 - `src/shared/api/generated.ts` 由 `pnpm run api:types` 派生，是只读产物，不在其中添加手写业务逻辑。
 - 首版只覆盖已确认的管理能力和通用工作区壳，不预先实现具体业务域，不虚构订单、库存、项目等业务。
+
+## 设计系统
+
+- 视觉取值的规范本体是 [DESIGN.md](DESIGN.md)（Carbon 来源）；色板、字号、间距和圆角以它为准，不在别处另行定义。
+- 组件样式只用 `src/styles/main.css` 的 `--jp-*` 语义 token 和 Element Plus 的 `--el-*` 变量，不写裸色值和裸字号。
+- `--el-*` 覆盖集中在 `src/styles/main.css`，依赖 `src/main.ts` 中 Element Plus 样式先于本项目引入；不要调整那两行的顺序，否则覆盖会静默失效。
+- 改动 `--jp-color-accent` 时必须按 Element Plus 的 `mix` 规则同步重算 light-3/5/7/8/9 与 dark-2，否则 hover、disabled 和浅底状态会留在旧主色。
+- UI/UX 规则查询用 `ui-ux-pro-max` 技能，且只允许定向检索：`python3 "$HOME/.agents/skills/ui-ux-pro-max/scripts/search.py" "<keyword>" --domain ux`（或用 `--stack vue`、`--domain chart`）。
+- 禁止使用该技能的 `--design-system`：它输出的是营销首页结构和与本项目冲突的配色、字体，会直接覆盖上述规范。该技能为全局安装，`uipro update` 会覆盖其调用路径修补，更新后需重新修补。
 
 ## 简单优先
 

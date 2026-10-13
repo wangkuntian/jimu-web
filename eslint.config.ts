@@ -17,6 +17,10 @@ export default defineConfigWithVueTs(
     '**/playwright-report/**',
     '**/test-results/**',
     'src/shared/api/generated.ts',
+    // 安装到仓库内的 agent skill 包与其 SDD 工作区：第三方内容，不参与本项目门禁。
+    // .gitignore 只影响 git 跟踪，ESLint 需要在这里单独排除。
+    '.agents/**',
+    '.superpowers/**',
   ]),
 
   ...pluginVue.configs['flat/essential'],
