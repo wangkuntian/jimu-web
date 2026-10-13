@@ -37,6 +37,7 @@ pnpm run dev             # http://localhost:5173，/api 代理到本地后端
 - 分支名取目标版本号，如 `release/v0.2.0`，与 `docs/releases/<version>.md` 的版本号一致。
 - 它是**短期集成分支**，不是长期分支：版本发布后删除，不长期驻留。
 - 各任务的提交先落在这条分支上；需要独立 review 的改动仍可另开 `feature/` 分支再并入本分支。
+- **合并策略与普通分支相反**：`feature/`、`fix/`、`hotfix/` 合入 `release/<version>` 时用 **squash merge**（保持集成分支线性、一个 PR 一个提交）；`release/<version>` 合入 `master` 时用 **merge commit**（保留版本内分主题的提交历史，这是集成分支存在的意义）。
 - 它不改变发布链路：**tag 仍然只能打在 `master` tip**（`release.yml` 的 `Verify Tag` 会校验），因此流程是「`release/<version>` 合入 `master` → 在 `master` tip 打 tag」。不要在该分支上打 tag。
 
 ## Commit 规范
@@ -71,7 +72,7 @@ bash scripts/check_commit_messages.sh origin/master HEAD
 2. 必须通过聚合检查 **`CI Gate`**（分支保护唯一 required 的检查名）
 3. 分支保护为 `strict`：PR 合并前需与 `master` 同步（页面上的 `Update branch`，或本地 rebase 后强推自己的分支）
 4. 不要求他人 approve（`required_approving_review_count: 0`），单人也能合并自己的 PR；有第二位贡献者后再收紧
-5. 合并策略：feature/fix/hotfix 用 squash merge；合并后删除源分支
+5. 合并策略：`feature`/`fix`/`hotfix` 合入 `release/<version>` 或 `master` 用 squash merge；`release/<version>` 合入 `master` 用 merge commit（见上）。合并后删除源分支
 
 ## CI 说明
 
