@@ -242,3 +242,5 @@ src/
 - **改密体验割裂**。应用内无改密端点，用户改密必须走邮箱验证码；若后端补齐改密端点，应同步替换 `password` 子页。
 - **`openapi-fetch` 的中间件递归风险**。重试必须走裸 `fetch`，否则会再次进入中间件。实现时需有测试覆盖。
 - **（2026-10-12 更正）会话状态的落点。** 决策表把 access token 记为「内存（Pinia）」，实施时落在 `src/shared/auth/session.ts` 的模块级变量：刷新与路由守卫都在模块作用域消费它，不需要响应式 store。`src/stores/session.ts` 的占位 store 因全仓零引用已删除；会话状态以「架构与目录」一节的 `shared/auth/session.ts` 为准。
+
+> **（2026-10-19 补充）注册入口的开关来源。** 决策表里「注册入口用构建期环境变量 `VITE_AUTH_REGISTER`」已被后端 v0.4.0 的 `GET /auth/config` 取代：运行时读取 `public_registration` / `provisioning_enabled`，关闭时隐藏入口并在 `/register` 渲染「注册未开放」，不再需要构建期变量（该变量从未实现，无迁移成本）。同时 `POST /auth/register` 的响应形状统一为 `{user, tenant?}`。

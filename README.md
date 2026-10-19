@@ -4,7 +4,7 @@
 
 Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管理员、租户管理员和普通业务用户提供统一入口。
 
-当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新和路由守卫已接入真实后端；平台与租户管理能力尚未实现。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
+当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新、路由守卫、会话引导（`/auth/me`）、运行时开关的注册页和租户管理页已接入真实后端；平台侧的套餐与配额、平台级系统状态尚未实现。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
 
 ## 仓库边界
 
@@ -37,6 +37,48 @@ pnpm run dev
 ```
 
 开发服务器启动后访问 `http://localhost:5173`。Vite 会将 `/api` 请求代理到本地 Jimu 后端。
+
+## 本地真机联调
+
+默认的 E2E 全部打桩，不需要后端。要验证真实链路（会话引导、注册开关、租户管理），按下面的顺序把 `../jimu` 的 compose 栈跑起来。
+
+### 前置
+
+- Docker（OrbStack 或 Docker Desktop）已启动。
+- `../jimu` 已克隆，且 `../jimu/.env` 与 `../jimu/secrets/*.txt` 就绪；缺 secrets 时先在 `../jimu` 运行 `make secrets`。
+- `../jimu/docker-compose.yml` 把 server 映射到 `127.0.0.1:8080`，与 `vite.config.ts` 的 `/api → http://localhost:8080` 代理一致。
+- 开发配置 `../jimu/configs/app.yaml` 为 `auth.public_registration: true`、`tenant.provisioning.enabled: false`，因此联调走**普通注册**（不创建租户）。
+
+### 起后端
+
+```bash
+cd ../jimu
+make compose-up                              # 启动 compose 栈，server 在 127.0.0.1:8080
+make compose-migrate                         # 首次运行、库表还没建时必须先迁移
+make compose-seed ADMIN_PASSWORD=Admin12345  # 结构种子：默认租户 + free 套餐 + 权限点 + 超级管理员角色 + admin
+cd -
+pnpm run dev                                 # 开发服务器 http://localhost:5173
+```
+
+`make compose-seed` 是幂等的，但**只在 `admin` 不存在时建号**：`admin` 已存在时它不会覆盖密码。此时要么用建号时的那个密码，要么删掉该账号后重新 seed。另外 `ADMIN_PASSWORD` 必须满足登录接口的校验 `min=8,max=32`，超长密码建出来的账号无法通过 `POST /auth/login`（返回 `1001 参数错误`）。
+
+### 验收路径与当前结果
+
+**注册（普通模式）→ 用新账号登录 → 租户列表**在真机上可用；**新建 / 改套餐 / 删除对运行时创建的租户当前不可用**。原因是 P1 雪花 ID 精度：后端把雪花 ID 作为 JSON number 输出（真值 `370528943163310080`），超出 JS 的 `Number.MAX_SAFE_INTEGER`（`9007199254740991`），浏览器拿到的数字被改写成相邻的 `370528943163310100`，行内动作于是打到不存在的租户 ID 上（`PUT …/plan` 还会返回静默的 `code:0`）。根因与实测见[版本日志 v0.3.0](docs/releases/v0.3.0.md)「说明」的 P1 条目。只有结构种子出来的租户 `default`（id=1）落在安全整数范围内，可以正常操作。
+
+### 权限前提
+
+只有结构种子出来的 `admin` 有管理权限；**公开注册出来的用户零角色**——`GET /api/v1/auth/me` 返回 200 且 `roles`/`permissions` 都是空数组，但同一个 token 调 `GET /api/v1/tenants` 是 `403`（`1003`）。界面把 `403` 渲染成无权限页（「没有访问租户管理的权限」）并**留在 `/platform/tenants`**，这是设计语义，**不是会话失效**；只有 `401` 才刷新凭证或回登录页。判权只看 `permissions`，不看角色名。
+
+### 可复现的端到端
+
+```bash
+E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 pnpm exec playwright test e2e/real-backend.spec.ts
+```
+
+`e2e/real-backend.spec.ts` 由 `E2E_REAL_BACKEND=1` 门控，默认跳过（CI 上没有后端）。它分两条用例：一条真实注册 `e2e_<时间戳>` 账号，验证零角色看不到「租户管理」入口、直达 `/platform/tenants` 得到无权限页并留在该路由，再用 `admin` 确认列表渲染出真实的 `default` 行；另一条走「新建 → 分配套餐 → 删除」，断言保持严格（不降级、不删除），但因为 P1 未修而**暂时整条跳过**——用例体首句是 `test.fixme(true, 'P1: …')`，测试体不执行，真机运行结果因此固定为 `1 passed / 1 skipped`。
+
+第二条用例目前无法可靠通过：行内动作发出的 ID 被改写，套餐写入落到不存在的租户上，行内仍显示「未分配」。**跳过是确定性的**，与后端当次生成的 id 无关。上一轮改用例用 known-failure 标记 `test.fail(true, 'P1: …')` 跟踪同一缺陷，但该标记是否命中取决于 id——实测 13 次真机运行 12 次命中，1 次因该 id 的最短十进制表示恰好等于自身而侥幸通过，那一次 Playwright 报 `Expected to fail, but passed` 并让套件退出码非 0，所以换成 `test.fixme`。后端把 `id` / `plan_id` 改为字符串序列化（并同步契约）后，**删掉这个标记就重新启用整条链路**：届时断言应当真正通过。
 
 ## CLI 命令
 
@@ -100,9 +142,13 @@ CI 的 `API Contract` job 除 `pnpm run api:check` 外还运行 `scripts/check_c
 ## 当前 Bootstrap 范围
 
 - `/` 重定向到 `/portal`。
-- `/portal`、`/workspace` 和 `/account/security` 提供真实的静态壳页面；三者均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
+- `/portal`、`/workspace`、`/account/security` 和 `/platform/tenants` 均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
 - 会话状态由 `src/shared/auth/session.ts` 的模块级变量承载：访问令牌只驻留内存，刷新令牌存 `sessionStorage`，不落盘，也不依赖 Pinia。
-- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；登录页已使用其表单、输入框、按钮与提示组件。
+- 受保护导航前先做会话引导 `GET /auth/me`：身份（`roles`/`permissions`）只驻内存，成功才缓存；`401`/`404` 清会话回登录页，`500` 与网络错误不登出。
+- 登录页与导航项、租户页的行内动作都按 `permissions` 判权（Casbin `keyMatch` 的前端等价实现），代码里不出现角色名；`403`（`1003`）渲染无权限态且留在原路由，不触发登出。
+- 注册入口由运行时 `GET /auth/config` 决定：`public_registration=false` 时登录页不显示入口，`/register` 渲染「注册未开放」；`provisioning_enabled=true` 才渲染租户字段。
+- `/platform/tenants` 已接入真实后端：关键字/状态/排序筛选、分页、新建、编辑、分配套餐、删除（二次确认）；不筛选状态时请求**不含** `status` 参数。
+- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；登录、注册与租户页都使用其表单、表格与提示组件。
 - API 契约转换、类型生成、格式化、lint、类型检查、单测、E2E 和构建均有独立 CLI。
 
 ## 后续首版目标
@@ -151,10 +197,10 @@ jimu-web/
 
 ## 验证方式
 
-- Vitest 覆盖信封解包、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、登录页错误码分支、应用外壳与布局渲染。
-- Playwright 当前验证 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
-- Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示。
-- 租户范围和无权限访问测试将在对应功能实现时补充。
+- Vitest 覆盖信封解包（2xx 与真实非 2xx 业务码）、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、会话引导（`401`/`404` 清会话，`500`/网络错误不登出）、权限判定（只看 `permissions`，不看角色名）、登录页错误码分支、注册页开关与载荷、租户列表 query 构造（不筛选时不传 `status`）、租户 API 与租户页四态及逐行动作判权。
+- Playwright 覆盖 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
+- Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示、租户列表渲染、无权限（本地缺权限与后端 `403` 两种来源）渲染无权限页且留在原路由。
+- 真机链路（真实后端）由 `E2E_REAL_BACKEND=1` 门控，见「本地真机联调」；默认不跑也不需要在 CI 上跑。
 - `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
 ## 相关文档
