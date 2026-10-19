@@ -3,13 +3,14 @@ import ElementPlus from 'element-plus'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { fetchCaptcha, login } from '../../src/features/auth/api'
+import { fetchAuthConfig, fetchCaptcha, login } from '../../src/features/auth/api'
 import LoginView from '../../src/features/auth/views/LoginView.vue'
 import { ApiError, ErrorCode } from '../../src/shared/api/unwrap'
 
-// LoginView 只通过 '../api' 消费这两个函数；真实请求与会话存储与本文件无关，
+// LoginView 只通过 '../api' 消费这三个函数；真实请求与会话存储与本文件无关，
 // 打桩后才能驱动「后端要求验证码、验证码接口却失败」这条路径。
 vi.mock('../../src/features/auth/api', () => ({
+  fetchAuthConfig: vi.fn(),
   fetchCaptcha: vi.fn(),
   login: vi.fn(),
 }))
@@ -48,6 +49,10 @@ function mountLogin(onError?: (error: unknown) => void) {
 describe('LoginView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(fetchAuthConfig).mockResolvedValue({
+      public_registration: false,
+      provisioning_enabled: false,
+    })
   })
 
   it('renders visible labels, not placeholders', () => {
@@ -163,5 +168,37 @@ describe('LoginView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/portal')
+  })
+
+  it('hides the register entry when public registration is closed', async () => {
+    vi.mocked(fetchAuthConfig).mockResolvedValue({
+      public_registration: false,
+      provisioning_enabled: false,
+    })
+    const wrapper = mountLogin()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="register-link"]').exists()).toBe(false)
+  })
+
+  it('shows the register entry and the success notice when the backend allows it', async () => {
+    vi.mocked(fetchAuthConfig).mockResolvedValue({
+      public_registration: true,
+      provisioning_enabled: false,
+    })
+    const router = createTestRouter()
+    await router.push({ path: '/login', query: { registered: '1' } })
+    await router.isReady()
+
+    const wrapper = mount(LoginView, {
+      global: {
+        plugins: [ElementPlus, router],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="register-link"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('注册成功')
   })
 })

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { fetchCaptcha, login } from '../api'
+import { fetchAuthConfig, fetchCaptcha, login } from '../api'
 import { ApiError, ErrorCode } from '../../../shared/api/unwrap'
 import AuthLayout from '../../../layouts/AuthLayout.vue'
 
@@ -23,6 +23,25 @@ const needsTotp = ref(false)
 const needsCaptcha = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+
+// 注册入口由运行时的公开开关决定：未知或关闭时都不显示（fail-closed）。
+const canRegister = ref(false)
+
+const registrationSucceeded = computed(() => route.query.registered === '1')
+
+/** 读取公开开关；失败时保持不显示注册入口，不影响登录本身。 */
+async function loadAuthConfig(): Promise<void> {
+  try {
+    const config = await fetchAuthConfig()
+    canRegister.value = config.public_registration === true
+  } catch {
+    canRegister.value = false
+  }
+}
+
+onMounted(() => {
+  void loadAuthConfig()
+})
 
 /** 拉取验证码；失败时就地反馈，不向上抛出。 */
 async function tryLoadCaptcha(): Promise<boolean> {
@@ -106,6 +125,14 @@ async function handleError(error: unknown): Promise<void> {
   <AuthLayout>
     <h1 class="page-section">登录 Jimu Portal</h1>
 
+    <el-alert
+      v-if="registrationSucceeded"
+      title="注册成功，请使用新账号登录"
+      type="success"
+      :closable="false"
+      show-icon
+    />
+
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" show-icon />
 
     <el-form label-position="top" @submit.prevent="onSubmit">
@@ -144,11 +171,22 @@ async function handleError(error: unknown): Promise<void> {
       </el-form-item>
 
       <el-button type="primary" native-type="submit" :loading="submitting">登录</el-button>
+
+      <RouterLink v-if="canRegister" class="register-link" data-test="register-link" to="/register">
+        注册新账号
+      </RouterLink>
     </el-form>
   </AuthLayout>
 </template>
 
 <style scoped>
+.register-link {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--jp-color-accent);
+  font-size: var(--jp-font-size-body);
+}
+
 .captcha-row {
   display: flex;
   align-items: center;
