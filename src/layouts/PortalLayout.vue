@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 
 import { LOGIN_ROUTE } from '../app/guards/session'
 import { logout } from '../features/auth/api'
+import { apiResource } from '../shared/api/config'
+import { hasPermission } from '../shared/auth/permission'
 
 const router = useRouter()
+
+// 导航项按权限隐藏；无权限时入口不出现，但路由本身仍可直达（页面会渲染无权限态）。
+const canViewTenants = computed(() => hasPermission(apiResource('/tenants'), 'GET'))
 
 async function onLogout(): Promise<void> {
   try {
@@ -23,6 +29,7 @@ async function onLogout(): Promise<void> {
         <RouterLink to="/portal">平台工作区</RouterLink>
         <RouterLink to="/workspace">业务工作区</RouterLink>
         <RouterLink to="/account/security">账号安全</RouterLink>
+        <RouterLink v-if="canViewTenants" to="/platform/tenants">租户管理</RouterLink>
       </nav>
       <el-button text @click="onLogout">退出登录</el-button>
     </header>

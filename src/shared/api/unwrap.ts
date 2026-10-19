@@ -31,12 +31,43 @@ export class ApiError extends Error {
   }
 }
 
-/** 后端统一响应信封；字段可选，因为契约把它们都标为非必需。 */
+/** 后端统一响应信封；分页端点还会带 total/page/page_size（`contract.PageResponse` 同形）。 */
 export interface Envelope {
   code?: number | undefined
   message?: string | undefined
   request_id?: string | undefined
   data?: unknown
+  total?: number | undefined
+  page?: number | undefined
+  page_size?: number | undefined
+}
+
+/**
+ * 取出「装着业务码的那个信封」。
+ *
+ * openapi-fetch 只在 2xx 把响应体写进 `data`；非 2xx 写进 `error`，`data` 是 undefined。
+ * 后端在非 2xx 上同样返回统一信封：`1006`/`2006`/`2007` 走 401，`1003`/`5005` 走 403，
+ * `1001`/`4001`/`4002`/`5004` 走 400，`2002`/`5003`/`5009` 走 409，`1007` 走 429。
+ * 只读 `data` 会把真实业务码退化成「服务端返回了空响应」（unknown），
+ * 登录/注册页的错误码分支与租户页的无权限/冲突状态就都分辨不出来。
+ * 业务码判断仍然只在 unwrap / unwrapEnvelope / unwrapOk 里发生一次。
+ */
+export function resolveEnvelope(result: {
+  data?: unknown
+  error?: unknown
+  response: Response
+}): Envelope | undefined {
+  return (result.response.ok ? result.data : (result.error ?? result.data)) as Envelope | undefined
+}
+
+/** 校验信封本身（非空 + code === 0），不做任何 data 形状判断。 */
+function assertOk(body: Envelope | undefined): asserts body is Envelope {
+  if (body === undefined) {
+    throw new ApiError(ErrorCode.unknown, '服务端返回了空响应')
+  }
+  if (body.code !== ErrorCode.ok) {
+    throw new ApiError(body.code ?? ErrorCode.unknown, body.message ?? '请求失败', body.request_id)
+  }
 }
 
 /**
@@ -46,16 +77,20 @@ export interface Envelope {
  * 也不直接消费 unknown。
  */
 export function unwrap<T>(body: Envelope | undefined): T {
-  if (body === undefined) {
-    throw new ApiError(ErrorCode.unknown, '服务端返回了空响应')
-  }
-  if (body.code !== ErrorCode.ok) {
-    throw new ApiError(body.code ?? ErrorCode.unknown, body.message ?? '请求失败', body.request_id)
-  }
+  assertOk(body)
   if (body.data === undefined || body.data === null) {
     throw new ApiError(ErrorCode.unknown, '响应缺少 data 字段', body.request_id)
   }
   return body.data as T
+}
+
+/**
+ * 校验信封本身并原样返回：分页端点需要 total/page/page_size，只取 data 会丢掉它们。
+ * 调用方仍然只在这里判断 code，不在 feature 里重复错误处理。
+ */
+export function unwrapEnvelope<T extends Envelope>(body: T | undefined): T {
+  assertOk(body)
+  return body
 }
 
 /**
@@ -78,15 +113,5 @@ export function unwrapPayload<T>(body: unknown): T {
  * PUT /tenants/{id}/plan 都是这一类，用 unwrap 会把成功判成「响应缺少 data 字段」。
  */
 export function unwrapOk(body: unknown): void {
-  const envelope = body as Envelope | undefined
-  if (envelope === undefined) {
-    throw new ApiError(ErrorCode.unknown, '服务端返回了空响应')
-  }
-  if (envelope.code !== ErrorCode.ok) {
-    throw new ApiError(
-      envelope.code ?? ErrorCode.unknown,
-      envelope.message ?? '请求失败',
-      envelope.request_id,
-    )
-  }
+  assertOk(body as Envelope | undefined)
 }

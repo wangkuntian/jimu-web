@@ -1,6 +1,63 @@
 import { describe, expect, it } from 'vitest'
 
-import { ApiError, ErrorCode, unwrap, unwrapOk, unwrapPayload } from '../../src/shared/api/unwrap'
+import {
+  ApiError,
+  ErrorCode,
+  resolveEnvelope,
+  unwrap,
+  unwrapEnvelope,
+  unwrapOk,
+  unwrapPayload,
+} from '../../src/shared/api/unwrap'
+
+describe('resolveEnvelope', () => {
+  it('reads data when the response is ok', () => {
+    const envelope = { code: 0, message: 'ok', data: { id: 7 } }
+
+    expect(
+      resolveEnvelope({
+        data: envelope,
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      }),
+    ).toBe(envelope)
+  })
+
+  it('reads error when the response is not ok', () => {
+    // openapi-fetch 只在 2xx 写 data；403 的 {code:1003,...} 落在 error 里。
+    const envelope = { code: ErrorCode.forbidden, message: '无权限', request_id: 'req-1' }
+
+    expect(
+      resolveEnvelope({
+        data: undefined,
+        error: envelope,
+        response: new Response(null, { status: 403 }),
+      }),
+    ).toBe(envelope)
+  })
+
+  it('falls back to data when a non-2xx response carried no error body', () => {
+    const envelope = { code: ErrorCode.unknown, message: '网关错误' }
+
+    expect(
+      resolveEnvelope({
+        data: envelope,
+        error: undefined,
+        response: new Response(null, { status: 502 }),
+      }),
+    ).toBe(envelope)
+  })
+
+  it('returns undefined when neither channel carried a body', () => {
+    expect(
+      resolveEnvelope({
+        data: undefined,
+        error: undefined,
+        response: new Response(null, { status: 204 }),
+      }),
+    ).toBeUndefined()
+  })
+})
 
 describe('unwrap', () => {
   it('returns the payload when the envelope code is zero', () => {
@@ -55,6 +112,33 @@ describe('unwrapPayload', () => {
     expect(() =>
       unwrapPayload({ code: ErrorCode.forbidden, message: '无权限', request_id: 'req-2' }),
     ).toThrowError('无权限')
+  })
+})
+
+describe('unwrapEnvelope', () => {
+  it('returns the whole envelope so paginated callers keep total/page/page_size', () => {
+    // /tenants 与 /tenant-plans 的分页元数据在信封的顶层，只取 data 会把它们丢掉。
+    const envelope = {
+      code: 0,
+      message: 'ok',
+      data: [{ id: 1 }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      request_id: 'req-4',
+    }
+
+    expect(unwrapEnvelope(envelope)).toBe(envelope)
+  })
+
+  it('throws the business error carried by the envelope', () => {
+    expect(() =>
+      unwrapEnvelope({ code: ErrorCode.forbidden, message: '无权限', request_id: 'req-5' }),
+    ).toThrowError('无权限')
+  })
+
+  it('rejects a body that is not an envelope at all', () => {
+    expect(() => unwrapEnvelope(undefined)).toThrowError('服务端返回了空响应')
   })
 })
 

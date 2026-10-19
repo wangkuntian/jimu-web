@@ -19,6 +19,19 @@ export const ADMIN_IDENTITY: E2eIdentity = {
   ],
 }
 
+/** 零角色用户：/auth/me 返回 200 + 空数组，这是合法身份而不是会话失效。 */
+export const ZERO_ROLE_IDENTITY: E2eIdentity = {
+  user: {
+    id: 11,
+    username: 'newcomer',
+    status: 1,
+    tenant_id: 1,
+    created_at: '2026-10-19T00:00:00Z',
+  },
+  roles: [],
+  permissions: [],
+}
+
 /**
  * 让会话引导返回给定身份。
  *

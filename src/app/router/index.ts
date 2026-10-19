@@ -42,6 +42,12 @@ const router = createRouter({
           name: 'account-security',
           component: () => import('../../views/AccountSecurityView.vue'),
         },
+        {
+          // 不加权限守卫：无权限用户必须能进入并看到无权限页，而不是被重定向。
+          path: '/platform/tenants',
+          name: 'platform-tenants',
+          component: () => import('../../features/tenants/views/TenantsView.vue'),
+        },
       ],
     },
   ],

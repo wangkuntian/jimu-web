@@ -7,6 +7,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
+    // 仓库里的组件钩子统一是 data-test；默认的 data-testid 配不上，getByTestId 会找不到元素。
+    testIdAttribute: 'data-test',
   },
   projects: [
     {
