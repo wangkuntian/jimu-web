@@ -1,4 +1,6 @@
-import type { TokenPair } from '../api/types'
+import { shallowRef } from 'vue'
+
+import type { Identity, TokenPair } from '../api/types'
 
 const REFRESH_TOKEN_KEY = 'jimu.refresh_token'
 const DEVICE_TOKEN_KEY = 'jimu.device_token'
@@ -7,6 +9,20 @@ const DEVICE_TOKEN_KEY = 'jimu.device_token'
 let accessToken: string | null = null
 /** 访问令牌的绝对到期时间（毫秒时间戳）。 */
 let expiresAt = 0
+/** 当前会话身份；内存驻留，不落盘、不进 Pinia。用 ref 让导航项能随引导完成重算。 */
+const identity = shallowRef<Identity | null>(null)
+
+export function getIdentity(): Identity | null {
+  return identity.value
+}
+
+export function saveIdentity(value: Identity): void {
+  identity.value = value
+}
+
+export function clearIdentity(): void {
+  identity.value = null
+}
 
 export function getAccessToken(): string | null {
   return accessToken
@@ -50,6 +66,7 @@ export function saveSession(tokens: TokenPair): void {
 export function clearSession(): void {
   accessToken = null
   expiresAt = 0
+  identity.value = null
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
 }
 

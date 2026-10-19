@@ -1,6 +1,7 @@
 import type { NavigationGuard } from 'vue-router'
 
-import { hasSession } from '../../shared/auth/session'
+import { ensureIdentity } from '../../shared/auth/identity'
+import { clearSession, hasSession } from '../../shared/auth/session'
 
 export const LOGIN_ROUTE = '/login'
 export const DEFAULT_AUTHENTICATED_ROUTE = '/portal'
@@ -34,11 +35,29 @@ export function resolveSessionNavigation(to: GuardTarget): SessionNavigation {
 }
 
 /**
+ * 会话引导 + 导航判定。
+ *
+ * 冷启动（sessionStorage 里有 refresh token）与登录后都走这里：受保护路由先取身份，
+ * 页面渲染时 hasPermission 就已经有数据。失败不拦：'unavailable' 只是后端抖动。
+ */
+export async function resolveGuardNavigation(to: GuardTarget): Promise<SessionNavigation> {
+  if (hasSession()) {
+    const status = await ensureIdentity()
+    if (status === 'unauthenticated') {
+      // 守卫自己会导航，所以用 clearSession 而不是 expireSession，避免订阅二次跳转。
+      clearSession()
+    }
+  }
+
+  return resolveSessionNavigation(to)
+}
+
+/**
  * `RouteMeta` 是 `Record<string | number | symbol, unknown>`，不能直接传给要求
  * `{ public?: boolean }` 的 `GuardTarget`，因此适配时只挑出守卫关心的公开标记。
  */
 export const sessionGuard: NavigationGuard = (to) =>
-  resolveSessionNavigation({
+  resolveGuardNavigation({
     path: to.path,
     fullPath: to.fullPath,
     meta: { public: to.meta.public === true },

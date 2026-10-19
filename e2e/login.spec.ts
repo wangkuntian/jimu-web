@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
 
+import { mockIdentity } from './helpers/session'
+
 test('redirects an unauthenticated visitor to login and back after signing in', async ({
   page,
 }) => {
@@ -13,6 +15,8 @@ test('redirects an unauthenticated visitor to login and back after signing in', 
       }),
     })
   })
+  // 登录后回跳受保护路由会触发会话引导，必须让 /auth/me 返回身份，否则会被弹回登录页。
+  await mockIdentity(page)
 
   await page.goto('/account/security')
   await expect(page).toHaveURL(/\/login\?redirect=/)
