@@ -1,6 +1,6 @@
 import { api } from '../../shared/api/client'
 import type { Captcha, TokenPair } from '../../shared/api/types'
-import { unwrap } from '../../shared/api/unwrap'
+import { unwrap, unwrapPayload } from '../../shared/api/unwrap'
 import { clearDeviceToken, clearSession, saveSession } from '../../shared/auth/session'
 
 export interface LoginPayload {
@@ -20,7 +20,8 @@ export async function fetchCaptcha(): Promise<Captcha> {
 export async function login(payload: LoginPayload): Promise<TokenPair> {
   const { data } = await api.POST('/auth/login', { body: payload })
 
-  const tokens = unwrap<TokenPair>(data)
+  // /auth/login 的响应 schema 现在是 contract.TokenPair（载荷型标注），运行时仍是信封。
+  const tokens = unwrapPayload<TokenPair>(data)
   saveSession(tokens)
   return tokens
 }

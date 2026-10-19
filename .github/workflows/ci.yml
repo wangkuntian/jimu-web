@@ -162,6 +162,9 @@ jobs:
       # api:check 重新生成 contracts/jimu.openapi.yaml 与 src/shared/api/generated.ts，
       # 再用 git diff --exit-code 判定是否与提交内容一致。
       - run: pnpm run api:check
+      # pin 校验：读 contracts/backend-commit.txt → 公开仓 fetch 该 SHA → 逐字节比对契约副本。
+      # 只读、零凭据、fail-closed：pin 未推送时 fetch 直接失败。
+      - run: bash scripts/check_contract_pin.sh
 
   # ── 构建层：产物供人工下载检查，也为将来的预览部署留出入口 ──────────────────────
   build:

@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/v1/admin/error-codes": {
+    "/admin/error-codes": {
         parameters: {
             query?: never;
             header?: never;
@@ -33,6 +33,15 @@ export interface paths {
                         "application/json": components["schemas"]["response.Body"];
                     };
                 };
+                /** @description 未认证 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["response.Body"];
+                    };
+                };
             };
         };
         put?: never;
@@ -43,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/ratelimit/auth": {
+    "/admin/ratelimit/auth": {
         parameters: {
             query?: never;
             header?: never;
@@ -86,6 +95,15 @@ export interface paths {
                         "*/*": components["schemas"]["response.Body"];
                     };
                 };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "*/*": components["schemas"]["response.Body"];
+                    };
+                };
                 /** @description Internal Server Error */
                 500: {
                     headers: {
@@ -99,6 +117,71 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 分配用户角色
+         * @description 替换指定用户的全部角色（按角色名）。角色名在用户所属租户内解析，不存在返回 404。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description 用户 ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            /** @description 角色名列表 */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description 成功 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["response.Body"];
+                    };
+                };
+                /** @description 参数错误 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 用户或角色不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -361,6 +444,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取认证能力开关
+         * @description 返回客户端渲染登录/注册入口所需的公开开关。无论是否开放公开注册，本端点都存在。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回注册相关开关 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["interfaces.AuthConfigResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/devices": {
         parameters: {
             query?: never;
@@ -596,7 +718,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["contract.TokenPair"];
                     };
                 };
                 /** @description 参数错误（用户名或密码格式不符） */
@@ -786,6 +908,63 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取当前会话身份与权限点
+         * @description 返回当前用户的身份、角色与有效权限点（resource + action，与 Casbin 策略同形，resource 支持通配）。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回身份与权限点 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["application.MeView"];
+                    };
+                };
+                /** @description 未认证 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 用户不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -997,7 +1176,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["contract.TokenPair"];
                     };
                 };
                 /** @description 参数错误 */
@@ -1038,7 +1217,7 @@ export interface paths {
         /**
          * 用户注册
          * @description 注册新用户账户。仅当系统配置中 public_registration 为 true 时可用。支持 IP 维度的限流保护。
-         *     开通式注册（auth.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
+         *     开通式注册（tenant.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
          *     普通注册（未启用开通式）时忽略租户字段，用户归默认租户，返回用户信息。
          *     开通式注册的 tenant_code 统一转小写存储，不传则自动生成；未传 tenant_name 报参数错误。
          */
@@ -1062,7 +1241,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.RegisterResponse"];
                     };
                 };
                 /** @description 参数错误（如用户名已存在、租户编码格式无效或已存在） */
@@ -2374,7 +2553,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.PlanPageResponse"];
                     };
                 };
                 /** @description 参数错误 */
@@ -2573,6 +2752,10 @@ export interface paths {
                     sort?: string;
                     /** @description 排序方向（asc 或 desc，默认 desc） */
                     order?: string;
+                    /** @description 编码或名称模糊匹配 */
+                    keyword?: string;
+                    /** @description 状态（0=停用 1=启用） */
+                    status?: number;
                 };
                 header?: never;
                 path?: never;
@@ -2586,7 +2769,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.TenantPageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段） */
@@ -2634,7 +2817,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.TenantBodyResponse"];
                     };
                 };
                 /** @description 参数错误（编码格式无效） */
@@ -2701,7 +2884,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.TenantBodyResponse"];
                     };
                 };
                 /** @description 参数错误（ID 格式无效） */
@@ -3412,6 +3595,83 @@ export interface components {
             phone?: string;
             username: string;
         };
+        "application.MeUser": {
+            created_at?: string;
+            id?: number;
+            status?: number;
+            tenant_id?: number;
+            username?: string;
+        };
+        "application.MeView": {
+            permissions?: components["schemas"]["application.PermissionPoint"][];
+            roles?: string[];
+            user?: components["schemas"]["application.MeUser"];
+        };
+        "application.PermissionPoint": {
+            action?: string;
+            resource?: string;
+        };
+        "application.PlanPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.PlanResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.PlanResponse": {
+            code?: string;
+            id?: number;
+            max_api_keys?: number;
+            max_roles?: number;
+            max_users?: number;
+            name?: string;
+        };
+        "application.RegisterResponse": {
+            tenant?: components["schemas"]["application.RegisterTenantView"];
+            user?: components["schemas"]["application.RegisterUserView"];
+        };
+        "application.RegisterTenantView": {
+            code?: string;
+            id?: number;
+            name?: string;
+            status?: number;
+        };
+        "application.RegisterUserView": {
+            created_at?: string;
+            email?: string;
+            id?: number;
+            phone?: string;
+            status?: number;
+            tenant_id?: number;
+            updated_at?: string;
+            username?: string;
+        };
+        "application.TenantBodyResponse": {
+            code?: number;
+            data?: components["schemas"]["application.TenantResponse"];
+            message?: string;
+            request_id?: string;
+        };
+        "application.TenantPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.TenantResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.TenantResponse": {
+            code?: string;
+            created_at?: string;
+            id?: number;
+            name?: string;
+            plan_id?: number;
+            status?: number;
+            updated_at?: string;
+        };
         "application.UpdatePermissionRequest": {
             action: string;
             name: string;
@@ -3467,6 +3727,19 @@ export interface components {
             page_size?: number;
             request_id?: string;
             total?: number;
+        };
+        "contract.TokenPair": {
+            access_token?: string;
+            /** @description DeviceToken 仅在「记住此设备」成功签发时返回，客户端需安全保存。 */
+            device_token?: string;
+            expires_in?: number;
+            refresh_token?: string;
+        };
+        "interfaces.AuthConfigResponse": {
+            /** @description ProvisioningEnabled 开通式注册：注册 = 开通新租户，tenant_name 必填 */
+            provisioning_enabled?: boolean;
+            /** @description PublicRegistration 是否开放公开注册（false 时 /auth/register 路由不注册） */
+            public_registration?: boolean;
         };
         "interfaces.disableTOTPRequest": {
             code: string;

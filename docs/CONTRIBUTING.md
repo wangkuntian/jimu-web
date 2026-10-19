@@ -78,15 +78,15 @@ bash scripts/check_commit_messages.sh origin/master HEAD
 
 `.github/workflows/ci.yml` 是唯一的质量管线：一个 `Changes` router 判断这次改动是不是纯文档，各领域 job 用 **job 级 `if`** 消费它的输出，最后由 `CI Gate` 收口。
 
-| Job                            | 何时运行              | 内容                                                                          |
-| ------------------------------ | --------------------- | ----------------------------------------------------------------------------- |
-| `Changes`                      | 始终                  | diff 分析，产出 `code`（是否非纯文档改动）                                    |
-| `Policy`                       | 始终（检查内容仅 PR） | commit message 规范、版本日志同步                                             |
-| `Quality & Tests (node 22/24)` | `code=true`           | `fmt:check`、`lint`、`typecheck`、`test`，矩阵覆盖 `engines` 声明的 Node 区间 |
-| `API Contract`                 | `code=true`           | `api:check`：重新生成契约派生文件并确认无差异                                 |
-| `Build`                        | `code=true`           | `build`，产物上传为 `dist` artifact                                           |
-| `E2E (Playwright)`             | `code=true`           | chromium 端到端，失败时上传 report 与 trace                                   |
-| `CI Gate`                      | 始终                  | 聚合判定，见下                                                                |
+| Job                            | 何时运行              | 内容                                                                                                       |
+| ------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Changes`                      | 始终                  | diff 分析，产出 `code`（是否非纯文档改动）                                                                 |
+| `Policy`                       | 始终（检查内容仅 PR） | commit message 规范、版本日志同步                                                                          |
+| `Quality & Tests (node 22/24)` | `code=true`           | `fmt:check`、`lint`、`typecheck`、`test`，矩阵覆盖 `engines` 声明的 Node 区间                              |
+| `API Contract`                 | `code=true`           | `api:check`：重新生成契约派生文件并确认无差异；`scripts/check_contract_pin.sh`：公开仓取证、逐字节比对 pin |
+| `Build`                        | `code=true`           | `build`，产物上传为 `dist` artifact                                                                        |
+| `E2E (Playwright)`             | `code=true`           | chromium 端到端，失败时上传 report 与 trace                                                                |
+| `CI Gate`                      | 始终                  | 聚合判定，见下                                                                                             |
 
 约定：
 
@@ -163,7 +163,7 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 - 不在前端复制后端领域规则（错误码分段、归属模型、套餐与配额上限）；需要时查 `jimu` 仓库文档
 - 不传租户标识（header、query、请求体都不传），租户范围与权限判定以服务端返回为准
 - `src/shared/api/generated.ts` 是 `pnpm run api:types` 的派生产物，只读，不手写业务逻辑
-- 契约变更流程：替换 `contracts/jimu.swagger.yaml` → 更新 `contracts/backend-commit.txt` → 运行 `pnpm run api:types` → 提交派生文件
+- 契约变更流程：运行 `scripts/sync-contract.sh [<ref>]`（写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，并重新生成类型）→ 提交派生文件；CI 用 `scripts/check_contract_pin.sh` 去公开仓取证并逐字节校验 pin
 - 修改脚本、工具或目录约定后，同步更新 [README.md](../README.md)
 
 提交前至少运行：

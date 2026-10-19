@@ -11,7 +11,7 @@ Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管�
 - `jimu-web`：页面、路由、权限展示、API client、前端测试和静态资源部署。
 - `jimu`：Go API、数据库迁移、OpenAPI 来源和后端部署。
 - 两个仓库独立版本化、独立 CI 和独立发布。
-- 前端通过固定的 Swagger 2.0 契约生成 OpenAPI 3.0 文件并消费类型，`contracts/backend-commit.txt` 记录对应的后端提交。
+- 前端通过固定的 Swagger 2.0 契约生成 OpenAPI 3.0 文件并消费类型，`contracts/backend-commit.txt` 是契约 pin（`scripts/sync-contract.sh` 写入，CI 逐字节校验）。
 
 ## 技术栈
 
@@ -76,7 +76,16 @@ pnpm run check
 
 ## OpenAPI 契约
 
-后端提供的是 Swagger 2.0，前端将其固定副本保存在 `contracts/jimu.swagger.yaml`，并通过 `contracts/backend-commit.txt` 记录来源提交。`pnpm run api:convert` 只生成 `contracts/jimu.openapi.yaml`；通常直接运行 `pnpm run api:types`，它会先转换再生成 TypeScript 类型：
+后端提供的是 Swagger 2.0。前端把来源提交固定为 `contracts/backend-commit.txt` 中那行 40 位 SHA——这就是契约 pin——并把该提交的 `docs/openapi/swagger.yaml` 逐字节复制到 `contracts/jimu.swagger.yaml`。
+
+同步契约走脚本，它是唯一入口：
+
+```bash
+scripts/sync-contract.sh                  # 取本地 ../jimu 的 HEAD（提交态，不是工作区）
+scripts/sync-contract.sh <sha|tag|branch> # 从公开远端 fetch --depth=1 取该提交
+```
+
+脚本写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，随后自动运行 `pnpm run api:types`。取「提交态」而不是工作区文件：后端仓库里未提交的本地改动不应该进契约副本；pin 也必须是**已推送**的提交，否则 CI 的 pin 校验会失败。`pnpm run api:convert` 只生成 `contracts/jimu.openapi.yaml`；通常直接运行 `pnpm run api:types`，它会先转换再生成 TypeScript 类型：
 
 ```bash
 pnpm run api:types
@@ -84,7 +93,9 @@ pnpm run api:types
 
 生成文件 `src/shared/api/generated.ts` 只包含派生类型，不在其中添加手写业务逻辑。
 
-当前后端 Swagger 源的 `/api/v1/admin/error-codes` 和 `/api/v1/admin/ratelimit/auth` 已包含 `basePath` 前缀，转换后存在重复 `/api/v1` 的风险。前端固定副本保持与后端来源一致；应在后端修复 Swagger 注解后重新同步，当前不要依赖这两个生成路径。
+CI 的 `API Contract` job 除 `pnpm run api:check` 外还运行 `scripts/check_contract_pin.sh`：它从公开仓 `fetch --depth=1` 取 pin 的 SHA，再与 `contracts/jimu.swagger.yaml` 逐字节比对。这一步只读、零凭据、fail-closed——pin 未推送时 fetch 直接失败，契约副本无法悄悄偏离来源提交。
+
+后端 `/api/v1/admin/error-codes` 与 `/api/v1/admin/ratelimit/auth` 的重复 `basePath` 前缀已修正，生成路径不再重复 `/api/v1`；但这两条 console 能力尚未接通认证链，运行时仍返回 401，前端不消费。
 
 ## 当前 Bootstrap 范围
 
@@ -124,7 +135,7 @@ jimu-web/
 ├── docs/               # 贡献指南、版本日志、设计文档和实现计划
 ├── e2e/                # Playwright 端到端测试
 ├── githooks/           # commit-msg 提交消息钩子
-├── scripts/            # 提交消息与聚合门禁校验脚本
+├── scripts/            # 契约同步与 pin 校验、提交消息与聚合门禁校验脚本
 ├── src/
 │   ├── app/             # 应用路由与守卫
 │   ├── features/        # 按用户能力组织的功能（auth：登录页与认证 API 封装）
