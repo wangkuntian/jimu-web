@@ -12,16 +12,34 @@ let expiresAt = 0
 /** 当前会话身份；内存驻留，不落盘、不进 Pinia。用 ref 让导航项能随引导完成重算。 */
 const identity = shallowRef<Identity | null>(null)
 
+/** 身份的加载状态；`'unknown'` 表示尚未加载或已被清理。 */
+export type IdentityStatus = 'ok' | 'unauthenticated' | 'unavailable'
+export type IdentityState = IdentityStatus | 'unknown'
+
+const identityStatus = shallowRef<IdentityState>('unknown')
+
+export function getIdentityStatus(): IdentityState {
+  return identityStatus.value
+}
+
+/** 只由身份引导流程写入；`saveIdentity` / `clearIdentity` / `clearSession` 会同步维护。 */
+export function setIdentityStatus(value: IdentityState): void {
+  identityStatus.value = value
+}
+
 export function getIdentity(): Identity | null {
   return identity.value
 }
 
 export function saveIdentity(value: Identity): void {
   identity.value = value
+  identityStatus.value = 'ok'
 }
 
 export function clearIdentity(): void {
   identity.value = null
+  // 清空身份意味着「还没加载」而不是「已加载且无权限」，不能残留 'ok'。
+  identityStatus.value = 'unknown'
 }
 
 export function getAccessToken(): string | null {
@@ -67,6 +85,7 @@ export function clearSession(): void {
   accessToken = null
   expiresAt = 0
   identity.value = null
+  identityStatus.value = 'unknown'
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
 }
 

@@ -69,7 +69,7 @@ test('P1: create → assign plan → delete a runtime-created tenant', async ({ 
   // 测试体首句：P1 修复前确定性跳过整条链路，不依赖后端当次生成的 id（known-failure 标记会翻转）。
   test.fixme(
     true,
-    'P1: 后端把雪花 ID 作为 JSON number 输出（如 370528943163310080），超出 JS 的 Number.MAX_SAFE_INTEGER，浏览器拿到的数字被改写成 370528943163310100，行内动作（分配套餐 / 删除）于是打到不存在的租户上；正确的修法是后端把 id / plan_id 序列化为 JSON string（并同步契约），修好后删掉本行 test.fixme 即可重新启用整条链路。',
+    'P1: 后端把雪花 ID 作为 JSON number 输出（如 370528943163310080），超出 JS 的 Number.MAX_SAFE_INTEGER，浏览器拿到的数字被改写成 370528943163310100，行内动作（分配套餐 / 删除）于是打到不存在的租户上；行内动作现在还额外受安全整数检查保护（不可精确的 ID 按钮禁用），因此这条链路只能在后端把 id / plan_id 序列化为 JSON string（并同步契约）之后才能执行：删掉本行 test.fixme 即可重新启用整条链路。',
   )
   const suffix = Date.now().toString(36)
   const tenantCode = `e2e_${suffix}`

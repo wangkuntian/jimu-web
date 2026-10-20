@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus from 'element-plus'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,8 +8,16 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import TenantsView from '../../src/features/tenants/views/TenantsView.vue'
 import { listPlans, listTenants } from '../../src/features/tenants/api'
 import { ApiError, ErrorCode } from '../../src/shared/api/unwrap'
-import { clearIdentity, saveIdentity } from '../../src/shared/auth/session'
+import { clearIdentity, saveIdentity, setIdentityStatus } from '../../src/shared/auth/session'
 import type { Identity } from '../../src/shared/api/types'
+
+const { ensureIdentityMock } = vi.hoisted(() => ({ ensureIdentityMock: vi.fn() }))
+
+// 身份引导的真实实现会走网络；视图只负责在不可用时重试，因此在这里替换成可断言的桩。
+vi.mock('../../src/shared/auth/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/shared/auth/identity')>()
+  return { ...actual, ensureIdentity: ensureIdentityMock }
+})
 
 vi.mock('../../src/features/tenants/api', () => ({
   listTenants: vi.fn(),
@@ -66,6 +75,32 @@ const planAssignerIdentity: Identity = {
   ],
 }
 
+/** 拥有逐行 `PUT` / `DELETE` 权限：用来验证行内按钮的启用/禁用，而不是可见性。 */
+const rowAdminIdentity: Identity = {
+  ...adminIdentity,
+  permissions: [
+    { resource: '/api/v1/tenants', action: 'GET' },
+    { resource: '/api/v1/tenants', action: 'POST' },
+    { resource: '/api/v1/tenants/*', action: 'PUT' },
+    { resource: '/api/v1/tenants/*', action: 'DELETE' },
+    { resource: '/api/v1/tenant-plans', action: 'GET' },
+  ],
+}
+
+/** 后端以 JSON number 输出的雪花 ID：`Number(...)` 就是 JSON.parse 之后浏览器看到的 double。 */
+const impreciseTenantId = Number('370528943163310080')
+
+function buttonByText(wrapper: ReturnType<typeof mountView>, text: string) {
+  return wrapper.findAll('button').find((button) => button.text() === text)
+}
+
+/** 真实点击时 el-pagination 先发 update:current-page（v-model 写入），再发 current-change。 */
+function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number): void {
+  const pagination = wrapper.findComponent('[data-test="tenants-pagination"]') as VueWrapper
+  pagination.vm.$emit('update:current-page', page)
+  pagination.vm.$emit('current-change', page)
+}
+
 function mountView() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -91,6 +126,7 @@ function mountView() {
 describe('TenantsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    ensureIdentityMock.mockReset()
     clearIdentity()
     listPlansMock.mockResolvedValue([])
   })
@@ -180,5 +216,150 @@ describe('TenantsView', () => {
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('分配套餐')
     expect(listPlansMock).not.toHaveBeenCalled()
+  })
+
+  it('hides the edit and delete row actions without per-row PUT/DELETE permissions', async () => {
+    // 行内「编辑」「删除」按各自请求路径逐行判权；只有列表 GET 时不渲染注定 403 的动作。
+    saveIdentity(viewerIdentity)
+    listTenantsMock.mockResolvedValue({ items: [tenant], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    const labels = wrapper.findAll('button').map((button) => button.text())
+    expect(labels).not.toContain('编辑')
+    expect(labels).not.toContain('删除')
+  })
+
+  it('renders the edit and delete row actions with per-row PUT/DELETE permissions', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({ items: [tenant], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    const labels = wrapper.findAll('button').map((button) => button.text())
+    expect(labels).toContain('编辑')
+    expect(labels).toContain('删除')
+  })
+
+  it('renders the loading state while the list request is pending', async () => {
+    saveIdentity(adminIdentity)
+    listTenantsMock.mockReturnValue(new Promise<never>(() => {}))
+    const wrapper = mountView()
+
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="tenants-loading"]').exists()).toBe(true),
+    )
+    expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(false)
+  })
+
+  it('resets to page 1 when the status filter changes on a later page', async () => {
+    saveIdentity(adminIdentity)
+    listTenantsMock.mockResolvedValue({ items: [tenant], total: 41, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+
+    emitPaginationPage(wrapper, 2)
+    await vi.waitFor(() => expect(listTenantsMock.mock.lastCall?.[0]).toMatchObject({ page: 2 }))
+
+    const statusSelect = wrapper.findComponent('[data-test="tenant-status"]') as VueWrapper
+    statusSelect.vm.$emit('update:modelValue', 0)
+    statusSelect.vm.$emit('change', 0)
+
+    // 在 page 2 上换筛选条件必须回到第 1 页，否则会拿旧页码去查新结果集。
+    await vi.waitFor(() =>
+      expect(listTenantsMock.mock.lastCall?.[0]).toMatchObject({ page: 1, status: 0 }),
+    )
+  })
+
+  it('clamps to the last valid page when the requested page comes back empty', async () => {
+    saveIdentity(adminIdentity)
+    listTenantsMock.mockImplementation(async (query) => {
+      if (query.page === 1) {
+        return { items: [tenant], total: 41, page: 1, pageSize: 20 }
+      }
+      if (query.page === 3) {
+        return { items: [], total: 25, page: 3, pageSize: 20 }
+      }
+      return { items: [tenant], total: 25, page: query.page, pageSize: 20 }
+    })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+
+    emitPaginationPage(wrapper, 3)
+
+    // 结果集缩到 25 条后，第 3 页越界：下一次请求必须落在最后有效页（ceil(25/20) = 2）。
+    await vi.waitFor(() => expect(listTenantsMock.mock.lastCall?.[0]).toMatchObject({ page: 2 }))
+    expect(listTenantsMock.mock.calls.map(([query]) => query.page)).toContain(3)
+  })
+
+  it('disables row actions and warns when a row id is not a safe integer', async () => {
+    // P1：后端把雪花 ID 作为 JSON number 输出，浏览器拿到的是被改写的 double。
+    // 写操作会打到不存在的租户上（PUT /plan 还会返回 code:0 的假成功），所以按钮必须禁用。
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: impreciseTenantId, code: 'runtime', name: '运行时租户' }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    expect(wrapper.find('[data-test="tenants-imprecise-id"]').exists()).toBe(true)
+
+    for (const label of ['编辑', '删除', '分配套餐']) {
+      const button = buttonByText(wrapper, label)
+      expect(button).toBeDefined()
+      expect(button?.attributes('disabled')).toBeDefined()
+    }
+  })
+
+  it('keeps row actions enabled and shows no warning for a safe-integer row id', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({ items: [tenant], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    expect(wrapper.find('[data-test="tenants-imprecise-id"]').exists()).toBe(false)
+
+    for (const label of ['编辑', '删除', '分配套餐']) {
+      const button = buttonByText(wrapper, label)
+      expect(button).toBeDefined()
+      expect(button?.attributes('disabled')).toBeUndefined()
+    }
+  })
+
+  it('renders the identity error state instead of the forbidden state when the identity is unavailable', async () => {
+    // 身份不可用（500/网络/非 2001 的 404）时 identity 为 null、hasPermission 必然 false；
+    // 把这种状态渲染成「没有权限」等于把一次后端抖动伪装成权限被收回。
+    setIdentityStatus('unavailable')
+    const wrapper = mountView()
+
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="tenants-identity-error"]').exists()).toBe(true),
+    )
+    expect(wrapper.find('[data-test="tenants-forbidden"]').exists()).toBe(false)
+    expect(listTenantsMock).not.toHaveBeenCalled()
+  })
+
+  it('retries the identity bootstrap from the identity error state', async () => {
+    setIdentityStatus('unavailable')
+    ensureIdentityMock.mockImplementation(async () => {
+      saveIdentity(adminIdentity)
+      return 'ok'
+    })
+    listTenantsMock.mockResolvedValue({ items: [tenant], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="tenants-identity-retry"]').exists()).toBe(true),
+    )
+    await wrapper.find('[data-test="tenants-identity-retry"]').trigger('click')
+
+    await vi.waitFor(() => expect(ensureIdentityMock).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(listTenantsMock).toHaveBeenCalled())
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
   })
 })

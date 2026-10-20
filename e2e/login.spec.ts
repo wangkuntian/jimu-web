@@ -26,6 +26,8 @@ test('redirects an unauthenticated visitor to login and back after signing in', 
   await page.getByRole('button', { name: '登录' }).click()
 
   await expect(page).toHaveURL(/\/account\/security$/)
+  // 回跳断言不能被一次「先到过目标路由又弹回登录页」满足。
+  await expect(page).not.toHaveURL(/\/login/)
 })
 
 test('reveals the totp field when the backend asks for a second factor', async ({ page }) => {

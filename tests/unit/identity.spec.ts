@@ -2,8 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 
 import { api } from '../../src/shared/api/client'
-import { ensureIdentity } from '../../src/shared/auth/identity'
-import { clearIdentity, getIdentity, hasSession, saveSession } from '../../src/shared/auth/session'
+import { ensureIdentity, getIdentityStatus } from '../../src/shared/auth/identity'
+import {
+  clearIdentity,
+  clearSession,
+  getIdentity,
+  hasSession,
+  saveIdentity,
+  saveSession,
+} from '../../src/shared/auth/session'
 
 vi.mock('../../src/shared/api/client', () => ({ api: { GET: vi.fn() } }))
 
@@ -56,9 +63,80 @@ describe('ensureIdentity', () => {
   })
 
   it('reports an unauthenticated session when the account is gone (404 / code 2001)', async () => {
+    saveSession(tokens)
     respond(404, { code: 2001, message: '用户不存在', request_id: 'req-9' })
 
     await expect(ensureIdentity()).resolves.toBe('unauthenticated')
+    expect(getIdentityStatus()).toBe('unauthenticated')
+  })
+
+  it('reports an unauthenticated session when the 404 envelope lands on the error side', async () => {
+    // openapi-fetch 对非 2xx 把响应体写进 error；业务码 2001 是「token 有效但账号已删」。
+    saveSession(tokens)
+    getMock.mockResolvedValueOnce({
+      data: undefined,
+      error: { code: 2001, message: '用户不存在', request_id: 'req-9' },
+      response: new Response(null, { status: 404 }),
+    })
+
+    await expect(ensureIdentity()).resolves.toBe('unauthenticated')
+    expect(getIdentityStatus()).toBe('unauthenticated')
+    expect(getIdentity()).toBeNull()
+  })
+
+  it('keeps the session when a 404 carries a different business code', async () => {
+    // 代理重写、basePath 配错、后端回滚都会返回 404；只有 2001 才等于会话失效。
+    saveSession(tokens)
+    getMock.mockResolvedValueOnce({
+      data: undefined,
+      error: { code: 2002, message: '用户名已存在' },
+      response: new Response(null, { status: 404 }),
+    })
+
+    await expect(ensureIdentity()).resolves.toBe('unavailable')
+    expect(getIdentityStatus()).toBe('unavailable')
+    expect(hasSession()).toBe(true)
+  })
+
+  it('keeps the session when a 404 body is not an envelope at all', async () => {
+    saveSession(tokens)
+    getMock.mockResolvedValueOnce({
+      data: undefined,
+      error: '<html><body>404 Not Found</body></html>',
+      response: new Response('<html><body>404 Not Found</body></html>', {
+        status: 404,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    })
+
+    await expect(ensureIdentity()).resolves.toBe('unavailable')
+    expect(getIdentityStatus()).toBe('unavailable')
+    expect(hasSession()).toBe(true)
+    expect(getIdentity()).toBeNull()
+  })
+
+  it('exposes the outcome of every identity load through getIdentityStatus', async () => {
+    expect(getIdentityStatus()).toBe('unknown')
+
+    respond(500, { code: 1005, message: '服务器内部错误' })
+    await ensureIdentity()
+    expect(getIdentityStatus()).toBe('unavailable')
+
+    respond(200, { code: 0, message: 'ok', data: me })
+    await ensureIdentity()
+    expect(getIdentityStatus()).toBe('ok')
+
+    clearIdentity()
+    // 清空身份 == 尚未加载，不能残留 'ok'；否则视图会把「身份没了」当成「有权限」。
+    expect(getIdentityStatus()).toBe('unknown')
+  })
+
+  it('resets the status to unknown when the session is cleared', () => {
+    saveIdentity(me)
+    expect(getIdentityStatus()).toBe('ok')
+
+    clearSession()
+    expect(getIdentityStatus()).toBe('unknown')
   })
 
   it('keeps the session when the backend fails', async () => {

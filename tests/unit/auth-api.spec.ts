@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchCaptcha, login, logout, logoutAll, register } from '../../src/features/auth/api'
+import {
+  fetchAuthConfig,
+  fetchCaptcha,
+  login,
+  logout,
+  logoutAll,
+  register,
+} from '../../src/features/auth/api'
 import {
   clearSession,
   getAccessToken,
@@ -155,6 +162,39 @@ describe('auth api', () => {
     await expect(register({ username: 'alice', password: 'secret123' })).rejects.toMatchObject({
       code: 2002,
       message: '用户名已存在',
+    })
+  })
+
+  it('normalizes the register 429 to the rate-limited business code', async () => {
+    // 注册限流的响应体可能不是标准信封；状态码 429 本身才是唯一可靠信号。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('rate limited', {
+            status: 429,
+            headers: { 'Content-Type': 'text/plain' },
+          }),
+      ),
+    )
+
+    const rejection = register({ username: 'alice', password: 'secret123' })
+    await expect(rejection).rejects.toBeInstanceOf(ApiError)
+    await expect(rejection).rejects.toMatchObject({ code: 1007 })
+  })
+
+  it('unwraps the runtime envelope returned by the auth config endpoint', async () => {
+    // /auth/config 的契约标注是载荷型，运行时仍是 {code,message,data} 信封。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({ code: 0, data: { public_registration: true, provisioning_enabled: false } }),
+      ),
+    )
+
+    await expect(fetchAuthConfig()).resolves.toEqual({
+      public_registration: true,
+      provisioning_enabled: false,
     })
   })
 

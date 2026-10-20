@@ -10,6 +10,7 @@ export const ErrorCode = {
   invalidCredentials: 1006,
   rateLimited: 1007,
   conflict: 1009,
+  userNotFound: 2001,
   userExists: 2002,
   invalidPassword: 2003,
   mfaRequired: 2006,

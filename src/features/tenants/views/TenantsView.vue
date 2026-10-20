@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -11,12 +11,13 @@ import {
   listTenants,
   updateTenant,
 } from '../api'
-import { buildTenantListQuery } from '../params'
+import { buildTenantListQuery, clampPage, isPreciseId } from '../params'
 import type { TenantFilters } from '../params'
 import { resolvePlanName } from '../plan-name'
 import { apiResource } from '../../../shared/api/config'
 import { ApiError, ErrorCode } from '../../../shared/api/unwrap'
 import type { Plan, Tenant } from '../../../shared/api/types'
+import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
 
 const queryClient = useQueryClient()
@@ -26,6 +27,8 @@ const canView = computed(() => hasPermission(apiResource('/tenants'), 'GET'))
 const canCreate = computed(() => hasPermission(apiResource('/tenants'), 'POST'))
 // 只是「能不能读套餐列表」，用来决定是否请求；行内「分配套餐」另有自己的 PUT 权限。
 const canListPlans = computed(() => hasPermission(apiResource('/tenant-plans'), 'GET'))
+// 身份不可用 ≠ 没有权限：500/网络/非 2001 的 404 会让身份为 null，hasPermission 必然 false。
+const identityStatus = computed(() => getIdentityStatus())
 
 const filters = reactive<TenantFilters>({
   page: 1,
@@ -67,14 +70,36 @@ const listError = computed(() => {
 const listErrorMessage = computed(() => listError.value?.message ?? '加载租户列表失败')
 const listErrorRequestId = computed(() => listError.value?.requestId ?? '')
 
+/** ID 超出安全整数范围时，行内写操作会打到错误的租户上，页面顶部统一提示一次。 */
+const hasImpreciseId = computed(() => items.value.some((row) => !isPreciseId(row.id)))
+
+const IMPRECISE_ID_HINT =
+  '后端以 JSON number 输出超出 JS 安全整数范围的 ID，写操作已禁用（改为字符串序列化后自动恢复，见版本日志 v0.3.0 的 P1 说明）'
+
 /**
  * 互斥状态，判定顺序即优先级：
- * 无权限（1003 或本地就缺权限）→ 加载中 → 错误 → 空 → 表格。
+ * 无权限/身份不可用 → 加载中 → 错误 → 空 → 表格。
+ *
+ * 身份不可用（500/网络/非 2001 的 404）时身份为 null、`hasPermission` 必然 false，
+ * 直接渲染无权限态会把一次后端抖动伪装成权限被收回；只有身份成功加载（`'ok'`）
+ * 且仍缺 GET 权限，或列表本身回答 1003，才渲染无权限页。
  * 403 留在本路由渲染说明，不跳登录；只有 401 才由 API 层走刷新/登录。
  */
-const viewState = computed<'forbidden' | 'loading' | 'error' | 'empty' | 'table'>(() => {
-  if (!canView.value || listError.value?.code === ErrorCode.forbidden) {
+const viewState = computed<
+  'forbidden' | 'identity-error' | 'loading' | 'error' | 'empty' | 'table'
+>(() => {
+  if (listError.value?.code === ErrorCode.forbidden) {
     return 'forbidden'
+  }
+  if (!canView.value) {
+    if (identityStatus.value === 'unavailable') {
+      return 'identity-error'
+    }
+    if (identityStatus.value === 'ok') {
+      return 'forbidden'
+    }
+    // 身份仍在引导中：先给加载态，避免把「尚未加载」误报成无权限。
+    return 'loading'
   }
   if (tenantsQuery.isPending.value) {
     return 'loading'
@@ -88,9 +113,37 @@ const viewState = computed<'forbidden' | 'loading' | 'error' | 'empty' | 'table'
   return 'table'
 })
 
+/** 任何筛选/排序变化都回到第 1 页：否则会拿旧页码去查新结果集。 */
+function resetPage(): void {
+  filters.page = 1
+}
+
+/**
+ * 结果集缩小时页码可能越界：后端对越界页返回空数组 + 真实 total，
+ * 不纠正就会把「本页没有数据」渲染成「一个租户都没有」。
+ */
+watch([items, total], ([rows, count]) => {
+  if (rows.length > 0 || count <= 0) {
+    return
+  }
+  const clamped = clampPage(filters.page, filters.pageSize, count)
+  if (clamped !== filters.page) {
+    filters.page = clamped
+  }
+})
+
 function applyKeyword(): void {
   filters.keyword = keywordDraft.value
   filters.page = 1
+}
+
+/** 身份引导重试：成功后 canView 变为 true，列表查询会自动放行。 */
+async function retryIdentity(): Promise<void> {
+  await ensureIdentity()
+}
+
+function rowActionHint(row: Tenant): string | undefined {
+  return isPreciseId(row.id) ? undefined : IMPRECISE_ID_HINT
 }
 
 function canUpdate(row: Tenant): boolean {
@@ -287,6 +340,23 @@ async function onDelete(row: Tenant): Promise<void> {
       />
     </div>
 
+    <div
+      v-else-if="viewState === 'identity-error'"
+      class="tenants-state"
+      data-test="tenants-identity-error"
+    >
+      <el-alert
+        type="error"
+        :closable="false"
+        show-icon
+        title="无法确认你的身份"
+        description="后端暂时不可用，读不到当前账号的身份与权限。这不代表权限被移除，请稍后重试。"
+      />
+      <el-button class="tenants-retry" data-test="tenants-identity-retry" @click="retryIdentity">
+        重试
+      </el-button>
+    </div>
+
     <template v-else>
       <div class="tenants-filters">
         <el-input
@@ -305,19 +375,30 @@ async function onDelete(row: Tenant): Promise<void> {
           class="tenants-select"
           placeholder="全部"
           aria-label="状态筛选"
+          @change="resetPage"
         >
           <el-option label="全部" value="" />
           <el-option label="启用" :value="1" />
           <el-option label="停用" :value="0" />
         </el-select>
 
-        <el-select v-model="filters.sort" class="tenants-select" aria-label="排序字段">
+        <el-select
+          v-model="filters.sort"
+          class="tenants-select"
+          aria-label="排序字段"
+          @change="resetPage"
+        >
           <el-option label="按 ID" value="id" />
           <el-option label="按编码" value="code" />
           <el-option label="按创建时间" value="created_at" />
         </el-select>
 
-        <el-select v-model="filters.order" class="tenants-select" aria-label="排序方向">
+        <el-select
+          v-model="filters.order"
+          class="tenants-select"
+          aria-label="排序方向"
+          @change="resetPage"
+        >
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>
@@ -331,6 +412,16 @@ async function onDelete(row: Tenant): Promise<void> {
           新建租户
         </el-button>
       </div>
+
+      <el-alert
+        v-if="hasImpreciseId"
+        data-test="tenants-imprecise-id"
+        class="tenants-id-warning"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="部分租户的行内操作已禁用——后端以 JSON number 输出超出 JS 安全整数范围的 ID，改为字符串序列化后自动恢复（见版本日志 v0.3.0 的 P1 说明）"
+      />
 
       <div v-if="viewState === 'loading'" class="tenants-state">
         <el-skeleton data-test="tenants-loading" :rows="4" animated />
@@ -375,6 +466,9 @@ async function onDelete(row: Tenant): Promise<void> {
                   v-if="canUpdate(scope.row)"
                   text
                   type="primary"
+                  :disabled="!isPreciseId(scope.row.id)"
+                  :title="rowActionHint(scope.row)"
+                  :aria-label="rowActionHint(scope.row)"
                   @click="openEdit(scope.row)"
                 >
                   编辑
@@ -383,6 +477,9 @@ async function onDelete(row: Tenant): Promise<void> {
                   v-if="canDelete(scope.row)"
                   text
                   type="danger"
+                  :disabled="!isPreciseId(scope.row.id)"
+                  :title="rowActionHint(scope.row)"
+                  :aria-label="rowActionHint(scope.row)"
                   @click="onDelete(scope.row)"
                 >
                   删除
@@ -391,6 +488,9 @@ async function onDelete(row: Tenant): Promise<void> {
                   v-if="canAssignPlan(scope.row)"
                   text
                   type="primary"
+                  :disabled="!isPreciseId(scope.row.id)"
+                  :title="rowActionHint(scope.row)"
+                  :aria-label="rowActionHint(scope.row)"
                   @click="openPlan(scope.row)"
                 >
                   分配套餐
@@ -399,16 +499,19 @@ async function onDelete(row: Tenant): Promise<void> {
             </el-table-column>
           </el-table>
         </div>
-
-        <el-pagination
-          v-model:current-page="filters.page"
-          class="tenants-pagination"
-          :page-size="filters.pageSize"
-          :total="total"
-          layout="prev, pager, next, total"
-          background
-        />
       </template>
+
+      <!-- 有总数就渲染分页：空/错误状态也要能翻页离开，不能被假空状态困住。 -->
+      <el-pagination
+        v-if="total > 0"
+        v-model:current-page="filters.page"
+        data-test="tenants-pagination"
+        class="tenants-pagination"
+        :page-size="filters.pageSize"
+        :total="total"
+        layout="prev, pager, next, total"
+        background
+      />
     </template>
 
     <el-dialog v-model="createVisible" title="新建租户" width="480px">
@@ -506,6 +609,10 @@ async function onDelete(row: Tenant): Promise<void> {
 
 .tenants-state {
   margin-top: 24px;
+}
+
+.tenants-id-warning {
+  margin-top: 16px;
 }
 
 .tenants-retry {

@@ -86,6 +86,7 @@ describe('RegisterView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="tenant-name"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="tenant-code"]').exists()).toBe(false)
 
     await fillCredentials(wrapper)
     await wrapper.find('form').trigger('submit')
@@ -138,6 +139,38 @@ describe('RegisterView', () => {
       tenant_code: 'acme',
     })
     expect(router.currentRoute.value.path).toBe('/login')
+  })
+
+  it('omits tenant_code from the payload when the optional field is left empty', async () => {
+    fetchAuthConfigMock.mockResolvedValue(provisioningConfig)
+    registerMock.mockResolvedValue({
+      user: {
+        id: 7,
+        username: 'alice',
+        status: 1,
+        tenant_id: 2,
+        created_at: '',
+        updated_at: '',
+        email: '',
+        phone: '',
+      },
+      tenant: { id: 2, code: 'acme', name: 'Acme', status: 1 },
+    })
+    const { wrapper } = mountRegister()
+    await flushPromises()
+
+    await fillCredentials(wrapper)
+    await wrapper.find('[data-test="tenant-name"] input').setValue('Acme')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    // 可选字段留空时不能发空串：后端会把它当成显式编码，形状就不诚实了。
+    expect(registerMock.mock.calls[0]![0]).toEqual({
+      username: 'alice',
+      password: 'secret123',
+      tenant_name: 'Acme',
+    })
+    expect(registerMock.mock.calls[0]![0]).not.toHaveProperty('tenant_code')
   })
 
   it('reveals the captcha field when the backend asks for one', async () => {

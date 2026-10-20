@@ -19,6 +19,7 @@ describe('keyMatch', () => {
     ['/api/v1/tenants', '/api/v1/tenants', true],
     ['/api/v1/tenants/7', '/api/v1/tenants/*', true],
     ['/api/v1/tenants/7/plan', '/api/v1/tenants/*', true],
+    ['/api/v1/tenants/', '/api/v1/tenants/*', true],
     ['/api/v1/tenants', '/api/v1/tenant-plans', false],
   ])('keyMatch(%s, %s) === %s', (requestPath, grantedResource, expected) => {
     expect(keyMatch(requestPath, grantedResource)).toBe(expected)
