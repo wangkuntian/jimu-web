@@ -20,7 +20,11 @@ if [ "$#" -gt 1 ]; then
 fi
 
 tmp=""
-cleanup() { [ -n "$tmp" ] && rm -rf "$tmp"; }
+staged_swagger=""
+cleanup() {
+  if [ -n "$tmp" ]; then rm -rf "$tmp"; fi
+  if [ -n "$staged_swagger" ]; then rm -f "$staged_swagger"; fi
+}
 trap cleanup EXIT
 
 if [ "$#" -eq 0 ]; then
@@ -43,11 +47,15 @@ else
   source_repo="$tmp"
 fi
 
-git -C "$source_repo" show "$sha:$swagger_path" > "$repo_root/contracts/jimu.swagger.yaml"
-grep -q '^swagger:' "$repo_root/contracts/jimu.swagger.yaml" || {
+# 先写同目录之外的临时文件、校验通过后再原子替换：失败时已跟踪的契约不能被截断或写坏。
+staged_swagger=$(mktemp "${TMPDIR:-/tmp}/jimu-swagger.XXXXXX")
+git -C "$source_repo" show "$sha:$swagger_path" > "$staged_swagger"
+grep -q '^swagger:' "$staged_swagger" || {
   echo "❌ $sha 的 $swagger_path 不是 Swagger 文档，拒绝写入" >&2
   exit 1
 }
+mv "$staged_swagger" "$repo_root/contracts/jimu.swagger.yaml"
+staged_swagger=""
 printf '%s\n' "$sha" > "$repo_root/contracts/backend-commit.txt"
 
 echo "✅ 已固定 jimu@$sha"

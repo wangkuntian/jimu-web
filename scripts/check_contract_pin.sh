@@ -9,6 +9,9 @@
 #   scripts/check_contract_pin.sh <sha>        # 校验指定 SHA（本地观察失败用）
 set -euo pipefail
 
+# 公开仓 fetch 不需要凭据；显式关掉 git 的交互式提问，凭据缺失时直接失败而不是挂住 CI。
+export GIT_TERMINAL_PROMPT=0
+
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 remote="${JIMU_REMOTE:-https://github.com/wangkuntian/jimu.git}"
 swagger_path="docs/openapi/swagger.yaml"
