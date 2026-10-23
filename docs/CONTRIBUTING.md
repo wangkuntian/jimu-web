@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你愿意为 Jimu Portal 贡献力量。本文档是开发流程的事实依据；协作规范（给 AI agent 的约束）见 [AGENTS.md](../AGENTS.md)，项目结构与 CLI 见 [README.md](../README.md)。
+感谢你愿意为 Jimu Hub 贡献力量。本文档是开发流程的事实依据；协作规范（给 AI agent 的约束）见 [AGENTS.md](../AGENTS.md)，项目结构与 CLI 见 [README.md](../README.md)。
 
 ## 开发环境
 
@@ -106,7 +106,7 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 
 - 发布在 `master` tip 打 `vMAJOR.MINOR.PATCH` tag（SemVer，无预发布标签）
 - 若本版本走了 `release/<version>` 集成分支，顺序是：该分支合入 `master` → 确认 `master` tip 通过 `CI Gate` → 在 `master` tip 打 tag；**不在集成分支上打 tag**
-- `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`pnpm run build`、打包 `jimu-portal-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
+- `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`pnpm run build`、打包 `jimu-hub-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
 - 发布产物是静态资源包，解压后的内容即站点根目录，由 Nginx/CDN 等静态托管
 - 回滚：`master` 不允许强推，用 revert commit 走正常 PR；已发布的 tag 不重打，改版本号重新发布
 

@@ -69,7 +69,10 @@ test('signs in and lists real tenants for a platform admin', async ({ page }) =>
   await page.getByLabel('密码').fill('secret123')
   await page.getByRole('button', { name: '登录' }).click()
 
-  await page.getByRole('link', { name: '租户管理' }).click()
+  await page
+    .locator('.sidebar-menu')
+    .getByRole('menuitem', { name: '租户管理', exact: true })
+    .click()
   await expect(page).toHaveURL(/\/platform\/tenants$/)
   // el-table 会渲染 header 与 body 两个 <table>，getByRole('table') 会撞 strict mode，
   // 因此断言落在 data-test 的横向滚动容器上（依赖 playwright.config 的 testIdAttribute）。

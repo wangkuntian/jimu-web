@@ -20,6 +20,9 @@ test('redirects an unauthenticated visitor to login and back after signing in', 
 
   await page.goto('/account/security')
   await expect(page).toHaveURL(/\/login\?redirect=/)
+  await expect(page.locator('.brand-mark')).toBeVisible()
+  await expect(page.locator('.brand-name')).toHaveText('Jimu Hub')
+  await expect(page.getByText('统一访问入口')).toHaveCount(0)
 
   await page.getByLabel('用户名').fill('alice')
   await page.getByLabel('密码').fill('secret123')
@@ -75,4 +78,36 @@ test('shows the backend message when credentials are rejected', async ({ page })
   await page.getByRole('button', { name: '登录' }).click()
 
   await expect(page.getByText('认证信息无效')).toBeVisible()
+})
+
+test('uses Carbon borders and a visible focus ring on login fields', async ({ page }) => {
+  await page.goto('/login')
+
+  const username = page.getByLabel('用户名')
+  const usernameShell = page.locator('.auth-form .el-input__wrapper').first()
+
+  await expect(usernameShell).toHaveCSS('box-shadow', 'rgb(224, 224, 224) 0px 0px 0px 1px inset')
+
+  await username.focus()
+
+  await expect(usernameShell).toHaveCSS('box-shadow', 'rgb(15, 98, 254) 0px 0px 0px 1px inset')
+  await expect(usernameShell).toHaveCSS('outline', 'rgb(15, 98, 254) solid 2px')
+})
+
+test('stacks the access entry without horizontal overflow on a narrow viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/login')
+
+  const contextBox = await page.locator('.auth-context').boundingBox()
+  const panelBox = await page.locator('.auth-panel').boundingBox()
+
+  expect(contextBox).not.toBeNull()
+  expect(panelBox).not.toBeNull()
+  expect(panelBox!.y).toBeGreaterThan(contextBox!.y)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(
+    false,
+  )
+  await expect(page.getByRole('button', { name: '登录' })).toHaveCSS('height', '44px')
 })

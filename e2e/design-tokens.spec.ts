@@ -57,9 +57,9 @@ test('renders the shell with Carbon tokens', async ({ page }) => {
   await seedSession(page)
   await page.goto('/portal')
 
-  await expect(page.locator('.brand')).toHaveCSS('color', 'rgb(15, 98, 254)')
+  await expect(page.locator('.brand')).toHaveCSS('color', 'rgb(22, 22, 22)')
   // 品牌名走 16px 小节标题，字重封顶 600（DESIGN.md 不允许 700）
   await expect(page.locator('.brand')).toHaveCSS('font-size', '16px')
   await expect(page.locator('.brand')).toHaveCSS('font-weight', '600')
-  await expect(page.locator('.primary-nav')).toHaveCSS('font-size', '14px')
+  await expect(page.locator('.sidebar-menu')).toHaveCSS('font-size', '14px')
 })

@@ -1,8 +1,8 @@
-# Jimu Portal
+# Jimu Hub
 
 ## 项目定位
 
-Jimu Portal 是 Jimu 后端配套的独立前端项目，目标是为平台管理员、租户管理员和普通业务用户提供统一入口。
+Jimu Hub 是 Jimu 后端配套的独立前端项目，目标是为平台管理员、租户管理员和普通业务用户提供统一入口。
 
 当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新、路由守卫、会话引导（`/auth/me`）、运行时开关的注册页和租户管理页已接入真实后端；平台侧的套餐与配额、平台级系统状态尚未实现。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
 
@@ -184,7 +184,8 @@ jimu-web/
 ├── scripts/            # 契约同步与 pin 校验、提交消息与聚合门禁校验脚本
 ├── src/
 │   ├── app/             # 应用路由与守卫
-│   ├── features/        # 按用户能力组织的功能（auth：登录页与认证 API 封装）
+│   ├── assets/          # 品牌标识等静态资源
+│   ├── features/        # 按用户能力组织的功能（auth：登录/注册与认证 API 封装）
 │   ├── layouts/         # AuthLayout 与 PortalLayout
 │   ├── shared/api/      # 生成的 API 类型、client、信封解包与载荷视图模型
 │   ├── shared/auth/     # 会话存储与刷新
@@ -198,8 +199,8 @@ jimu-web/
 ## 验证方式
 
 - Vitest 覆盖信封解包（2xx 与真实非 2xx 业务码）、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、会话引导（`401`/`404` 清会话，`500`/网络错误不登出）、权限判定（只看 `permissions`，不看角色名）、登录页错误码分支、注册页开关与载荷、租户列表 query 构造（不筛选时不传 `status`）、租户 API 与租户页四态及逐行动作判权。
-- Playwright 覆盖 `/portal` 页面标题、平台工作区标题，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
-- Playwright 另覆盖：未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示、租户列表渲染、无权限（本地缺权限与后端 `403` 两种来源）渲染无权限页且留在原路由。
+- Playwright 覆盖 `/portal` 工作概览、可展开/收起且权限驱动的侧边栏、管理员与零角色两种首页状态、822px 双栏与窄屏单列布局，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
+- Playwright 另覆盖：认证页品牌与表单状态、窄屏布局、未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示、租户列表渲染、无权限（本地缺权限与后端 `403` 两种来源）渲染无权限页且留在原路由。
 - 真机链路（真实后端）由 `E2E_REAL_BACKEND=1` 门控，见「本地真机联调」；默认不跑也不需要在 CI 上跑。
 - `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
@@ -207,7 +208,9 @@ jimu-web/
 
 - [贡献指南](docs/CONTRIBUTING.md)：分支、提交消息、PR、CI 与发布流程
 - [版本日志 v0.1.0](docs/releases/v0.1.0.md)
-- [Jimu Portal 前端设计](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)
+- [Jimu Hub 前端设计（原 Jimu Portal 文档）](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)
+- [Jimu Hub 品牌命名与认证页调整](docs/superpowers/specs/2026-10-22-jimu-hub-brand-rename.md)
+- [Jimu Hub 登录后导航框架](docs/superpowers/specs/2026-10-22-jimu-hub-workspace-navigation.md)
 - [设计规范 DESIGN.md](DESIGN.md)
 - [设计系统来源与 UI 规范](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)
 - [初始化实现计划](docs/superpowers/plans/2026-09-20-jimu-web-bootstrap.md)

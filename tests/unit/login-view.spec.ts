@@ -63,6 +63,19 @@ describe('LoginView', () => {
     expect(wrapper.text()).toContain('记住此设备')
   })
 
+  it('presents a structured access entry with the form as the primary landmark', () => {
+    const wrapper = mountLogin()
+
+    expect(wrapper.find('header.auth-masthead').exists()).toBe(true)
+    expect(wrapper.find('main.auth-workspace').exists()).toBe(true)
+    expect(wrapper.find('section.auth-context').exists()).toBe(true)
+    expect(wrapper.findAll('h1')).toHaveLength(1)
+    expect(wrapper.find('h1').text()).toBe('欢迎回来')
+    expect(wrapper.find('.brand-mark').exists()).toBe(true)
+    expect(wrapper.find('.brand-name').text()).toBe('Jimu Hub')
+    expect(wrapper.find('ol').exists()).toBe(false)
+  })
+
   it('hides the totp and captcha fields by default', () => {
     const wrapper = mountLogin()
 
@@ -97,7 +110,7 @@ describe('LoginView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('验证码错误，请重新输入')
-    expect(wrapper.find('.captcha-image').attributes('src')).toBe('data:image/png;base64,AA')
+    expect(wrapper.find('.auth-captcha-image').attributes('src')).toBe('data:image/png;base64,AA')
     expect(errors).toHaveLength(0)
   })
 

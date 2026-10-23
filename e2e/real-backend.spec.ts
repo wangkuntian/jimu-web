@@ -20,7 +20,7 @@ test('drives the real stack: register → zero-role login → admin tenant list'
 
   await page.getByTestId('username').locator('input').fill(username)
   await page.getByTestId('password').locator('input').fill('secret123')
-  await page.getByRole('button', { name: '注册' }).click()
+  await page.getByRole('button', { name: '完成注册' }).click()
   await expect(page).toHaveURL(/\/login\?registered=1/)
   await expect(page.getByText('注册成功')).toBeVisible()
 
@@ -36,12 +36,16 @@ test('drives the real stack: register → zero-role login → admin tenant list'
 
   // 3) admin 登录后看到真实列表。
   // 已登录用户会被会话守卫从 /login 弹回 /portal，所以先走真实登出再换账号。
-  await page.getByRole('button', { name: '退出登录' }).click()
+  await page.getByRole('button', { name: '打开账户菜单' }).click()
+  await page.getByRole('menuitem', { name: '退出登录' }).click()
   await expect(page).toHaveURL(/\/login/)
   await page.getByLabel('用户名').fill('admin')
   await page.getByLabel('密码').fill(adminPassword)
   await page.getByRole('button', { name: '登录' }).click()
-  await page.getByRole('link', { name: '租户管理' }).click()
+  await page
+    .locator('.sidebar-menu')
+    .getByRole('menuitem', { name: '租户管理', exact: true })
+    .click()
   await expect(page).toHaveURL(/\/platform\/tenants$/)
   // el-table 会渲染 header 与 body 两个 <table>，断言落在 data-test 的容器上。
   await expect(page.getByTestId('tenants-table')).toContainText('default')

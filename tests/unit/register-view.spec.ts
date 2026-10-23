@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -20,7 +21,7 @@ const fetchCaptchaMock = vi.mocked(fetchCaptcha)
 const plainConfig = { public_registration: true, provisioning_enabled: false }
 const provisioningConfig = { public_registration: true, provisioning_enabled: true }
 
-function mountRegister() {
+function mountRegister(options: { attachTo?: boolean } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -29,7 +30,13 @@ function mountRegister() {
       { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
     ],
   })
-  return { router, wrapper: mount(RegisterView, { global: { plugins: [ElementPlus, router] } }) }
+  return {
+    router,
+    wrapper: mount(RegisterView, {
+      attachTo: options.attachTo ? document.body : undefined,
+      global: { plugins: [ElementPlus, router] },
+    }),
+  }
 }
 
 async function fillCredentials(wrapper: ReturnType<typeof mountRegister>['wrapper']) {
@@ -41,6 +48,40 @@ describe('RegisterView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     fetchAuthConfigMock.mockResolvedValue(plainConfig)
+  })
+
+  it('renders the shared access shell with field guidance and a login link', async () => {
+    const { wrapper } = mountRegister()
+    await flushPromises()
+
+    expect(wrapper.find('.auth-shell').exists()).toBe(true)
+    expect(wrapper.find('.auth-context').exists()).toBe(true)
+    expect(wrapper.findAll('h1')).toHaveLength(1)
+    expect(wrapper.find('h1').text()).toBe('创建账号')
+    expect(wrapper.find('.brand-name').text()).toBe('Jimu Hub')
+    expect(wrapper.find('ol').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('注册从清晰的账号边界开始')
+    expect(wrapper.text()).not.toContain('ENTERPRISE ACCESS')
+    expect(wrapper.text()).toContain('返回登录')
+    expect(wrapper.find('[data-test="password-help"]').text()).toContain(
+      '8–32 位且同时包含字母和数字',
+    )
+    expect(wrapper.find('[data-test="login-link"]').exists()).toBe(true)
+  })
+
+  it('focuses a validation summary when client-side validation fails', async () => {
+    const { wrapper } = mountRegister({ attachTo: true })
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    await nextTick()
+
+    const summary = wrapper.find('[data-test="validation-summary"]')
+    expect(summary.exists()).toBe(true)
+    expect(document.activeElement).toBe(summary.element)
+
+    wrapper.unmount()
   })
 
   it('does not render a form when public registration is closed', async () => {

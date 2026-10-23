@@ -31,22 +31,26 @@ const router = createRouter({
           path: '',
           name: 'portal-home',
           component: () => import('../../views/PortalView.vue'),
+          meta: { navLabel: '工作概览' },
         },
         {
           path: '/workspace',
           name: 'workspace',
           component: () => import('../../views/WorkspaceView.vue'),
+          meta: { navLabel: '业务工作区' },
         },
         {
           path: '/account/security',
           name: 'account-security',
           component: () => import('../../views/AccountSecurityView.vue'),
+          meta: { navLabel: '账号安全' },
         },
         {
           // 不加权限守卫：无权限用户必须能进入并看到无权限页，而不是被重定向。
           path: '/platform/tenants',
           name: 'platform-tenants',
           component: () => import('../../features/tenants/views/TenantsView.vue'),
+          meta: { navLabel: '租户管理' },
         },
       ],
     },

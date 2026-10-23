@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 
@@ -28,6 +28,8 @@ const captchaImage = ref('')
 const submitting = ref(false)
 const errorMessage = ref('')
 const requestId = ref('')
+const validationSummary = ref('')
+const validationSummaryRef = ref<HTMLElement | null>(null)
 
 // tenant_name 只在开通式注册下必填；tenant_code 始终可选，但格式受后端约束。
 const rules = computed<FormRules>(() => ({
@@ -132,8 +134,14 @@ async function onSubmit(): Promise<void> {
   if (submitting.value) return
   errorMessage.value = ''
   requestId.value = ''
+  validationSummary.value = ''
 
-  if (!(await validateForm())) return
+  if (!(await validateForm())) {
+    validationSummary.value = '请检查下方标出的字段并修正后重试。'
+    await nextTick()
+    validationSummaryRef.value?.focus()
+    return
+  }
 
   submitting.value = true
 
@@ -185,43 +193,83 @@ onMounted(() => {
 </script>
 
 <template>
-  <AuthLayout>
-    <h1 class="page-section">注册 Jimu Portal</h1>
+  <AuthLayout panel-title="创建账号" panel-description="填写信息以创建你的 Jimu Hub 账号。">
+    <div v-if="errorMessage || validationSummary" class="auth-alert-stack">
+      <div
+        v-if="validationSummary"
+        ref="validationSummaryRef"
+        class="validation-summary"
+        tabindex="-1"
+        aria-label="表单校验错误"
+        data-test="validation-summary"
+      >
+        <el-alert :title="validationSummary" type="error" :closable="false" show-icon />
+      </div>
 
-    <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" show-icon />
+      <el-alert
+        v-if="errorMessage"
+        :title="errorMessage"
+        type="error"
+        :closable="false"
+        show-icon
+      />
 
-    <p v-if="requestId" class="request-id">请求编号：{{ requestId }}</p>
+      <p v-if="requestId" class="request-id">请求编号：{{ requestId }}</p>
+    </div>
 
     <div v-if="!publicRegistration" data-test="register-closed" class="register-closed">
-      <p class="page-note">
-        {{ configLoaded ? '注册未开放' : '无法确认注册开关，请稍后重试' }}
+      <p class="register-closed-title">
+        {{ configLoaded ? '注册未开放' : '暂时无法确认注册状态' }}
+      </p>
+      <p class="register-closed-description">
+        {{
+          configLoaded
+            ? '管理员尚未开放公开注册，你可以返回登录页。'
+            : '注册状态读取失败，请稍后重试。'
+        }}
       </p>
 
       <div class="register-closed-actions">
-        <el-button v-if="!configLoaded" @click="loadConfig">重试</el-button>
-        <RouterLink class="register-back" to="/login">返回登录</RouterLink>
+        <el-button v-if="!configLoaded" size="large" @click="loadConfig">重试</el-button>
+        <RouterLink class="auth-link" data-test="login-link" to="/login">返回登录</RouterLink>
       </div>
     </div>
 
     <el-form
       v-else
       ref="formRef"
+      class="auth-form"
       :model="form"
       :rules="rules"
       label-position="top"
       @submit.prevent="onSubmit"
     >
       <el-form-item label="用户名" prop="username" data-test="username">
-        <el-input v-model="form.username" autocomplete="username" />
+        <el-input
+          v-model="form.username"
+          size="large"
+          autocomplete="username"
+          aria-required="true"
+          aria-describedby="register-username-help"
+        />
+        <p id="register-username-help" class="auth-field-help" data-test="username-help">
+          4–20 位字母、数字或下划线
+        </p>
       </el-form-item>
 
       <el-form-item label="密码" prop="password" data-test="password">
         <el-input
           v-model="form.password"
+          size="large"
           type="password"
           show-password
           autocomplete="new-password"
+          aria-required="true"
+          aria-describedby="register-password-help"
         />
+        <p id="register-password-help" class="auth-field-help" data-test="password-help">
+          8–32 位且同时包含字母和数字
+        </p>
       </el-form-item>
 
       <el-form-item
@@ -230,7 +278,12 @@ onMounted(() => {
         prop="tenantName"
         data-test="tenant-name"
       >
-        <el-input v-model="form.tenantName" autocomplete="organization" />
+        <el-input
+          v-model="form.tenantName"
+          size="large"
+          autocomplete="organization"
+          aria-required="true"
+        />
       </el-form-item>
 
       <el-form-item
@@ -239,56 +292,99 @@ onMounted(() => {
         prop="tenantCode"
         data-test="tenant-code"
       >
-        <el-input v-model="form.tenantCode" />
+        <el-input
+          v-model="form.tenantCode"
+          size="large"
+          aria-describedby="register-tenant-code-help"
+        />
+        <p id="register-tenant-code-help" class="auth-field-help">仅限字母、数字、短横线和下划线</p>
       </el-form-item>
 
       <el-form-item v-if="needsCaptcha" label="图形验证码" data-test="captcha">
-        <div class="captcha-row">
-          <el-input v-model="form.captchaCode" autocomplete="off" />
-          <img v-if="captchaImage" :src="captchaImage" alt="图形验证码" class="captcha-image" />
+        <div class="auth-captcha-row">
+          <el-input
+            v-model="form.captchaCode"
+            size="large"
+            autocomplete="off"
+            aria-required="true"
+          />
+          <img
+            v-if="captchaImage"
+            :src="captchaImage"
+            alt="图形验证码"
+            class="auth-captcha-image"
+          />
         </div>
       </el-form-item>
 
-      <el-button type="primary" native-type="submit" :loading="submitting">注册</el-button>
+      <el-button
+        class="auth-submit"
+        type="primary"
+        size="large"
+        native-type="submit"
+        :loading="submitting"
+      >
+        完成注册
+      </el-button>
 
-      <p class="page-note">注册成功后请使用新账号登录。</p>
+      <div class="register-form-footer">
+        <span>已有账号？</span>
+        <RouterLink class="auth-link" data-test="login-link" to="/login">返回登录</RouterLink>
+      </div>
     </el-form>
   </AuthLayout>
 </template>
 
 <style scoped>
+.validation-summary:focus {
+  outline: 2px solid var(--jp-color-accent);
+  outline-offset: 2px;
+}
+
 .request-id {
-  margin: 12px 0 0;
+  margin: 0;
   color: var(--jp-color-text-muted);
   font-size: var(--jp-font-size-caption);
 }
 
 .register-closed {
+  padding: 20px;
   margin-top: 24px;
+  background: var(--jp-color-app-bg);
+  border: 1px solid var(--jp-color-hairline);
+  border-radius: var(--jp-radius-control);
+}
+
+.register-closed-title {
+  margin: 0;
+  color: var(--jp-color-text);
+  font-size: var(--jp-font-size-subtitle);
+  font-weight: var(--jp-font-weight-emphasis);
+  line-height: 1.5;
+}
+
+.register-closed-description {
+  margin: 8px 0 0;
+  color: var(--jp-color-text-muted);
+  font-size: var(--jp-font-size-body);
+  line-height: 1.5;
 }
 
 .register-closed-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 12px 16px;
+  margin-top: 16px;
 }
 
-.register-back {
-  color: var(--jp-color-accent);
-  font-size: var(--jp-font-size-body);
-}
-
-.captcha-row {
+.register-form-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.captcha-image {
-  height: 32px;
-  border: 1px solid var(--jp-color-hairline);
-  border-radius: var(--jp-radius-control);
+  gap: 8px;
+  margin-top: 20px;
+  color: var(--jp-color-text-muted);
+  font-size: var(--jp-font-size-caption);
 }
 </style>
