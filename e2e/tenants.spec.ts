@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-import { seedSession, ADMIN_IDENTITY, ZERO_ROLE_IDENTITY } from './helpers/session'
+import { seedSession, ADMIN_IDENTITY, USER_MANAGER_IDENTITY } from './helpers/session'
 
 const tokenBody = {
   code: 0,
@@ -9,7 +9,7 @@ const tokenBody = {
 }
 
 const tenant = {
-  id: 1,
+  id: '1',
   code: 'default',
   name: '默认租户',
   status: 1,
@@ -69,18 +69,21 @@ test('signs in and lists real tenants for a platform admin', async ({ page }) =>
   await page.getByLabel('密码').fill('secret123')
   await page.getByRole('button', { name: '登录' }).click()
 
+  await expect(page).toHaveURL(/\/hub$/)
+  await page.getByTestId('hub-admin').click()
+  await expect(page).toHaveURL(/\/admin$/)
   await page
     .locator('.sidebar-menu')
     .getByRole('menuitem', { name: '租户管理', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/platform\/tenants$/)
+  await expect(page).toHaveURL(/\/admin\/tenants$/)
   // el-table 会渲染 header 与 body 两个 <table>，getByRole('table') 会撞 strict mode，
   // 因此断言落在 data-test 的横向滚动容器上（依赖 playwright.config 的 testIdAttribute）。
   await expect(page.getByTestId('tenants-table')).toContainText('default')
   await expect(page.getByTestId('tenants-table')).toContainText('专业版')
 })
 
-test('renders the no-permission page for a zero-role user without leaving the route', async ({
+test('renders the no-permission page for a user manager without tenant access', async ({
   page,
 }) => {
   let listRequests = 0
@@ -93,10 +96,10 @@ test('renders the no-permission page for a zero-role user without leaving the ro
     })
   })
 
-  await seedSession(page, ZERO_ROLE_IDENTITY)
-  await page.goto('/platform/tenants')
+  await seedSession(page, USER_MANAGER_IDENTITY)
+  await page.goto('/admin/tenants')
 
-  await expect(page).toHaveURL(/\/platform\/tenants$/)
+  await expect(page).toHaveURL(/\/admin\/tenants$/)
   await expect(page.getByText('没有访问租户管理的权限')).toBeVisible()
   // 导航项按权限隐藏，且没有发出注定 403 的列表请求
   await expect(page.getByRole('link', { name: '租户管理' })).toHaveCount(0)
@@ -130,8 +133,8 @@ test('renders the no-permission page when the list itself answers 403', async ({
   )
 
   await seedSession(page, ADMIN_IDENTITY)
-  await page.goto('/platform/tenants')
+  await page.goto('/admin/tenants')
 
-  await expect(page).toHaveURL(/\/platform\/tenants$/)
+  await expect(page).toHaveURL(/\/admin\/tenants$/)
   await expect(page.getByText('没有访问租户管理的权限')).toBeVisible()
 })

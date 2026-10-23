@@ -1,0 +1,230 @@
+import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import { seedSession } from './helpers/session'
+
+const tenant = {
+  id: 'tenant-1',
+  code: 'acme',
+  name: 'Acme',
+  status: 1,
+  plan_id: 0,
+  created_at: '2026-10-19T00:00:00Z',
+  updated_at: '2026-10-19T00:00:00Z',
+}
+
+const user = {
+  id: 'user-1',
+  username: 'alice',
+  email: 'alice@example.com',
+  phone: '13800000000',
+  status: 1,
+  tenant: { id: tenant.id, name: tenant.name },
+  roles: [{ id: 'role-developer', name: 'developer' }],
+  created_at: '2026-10-19T00:00:00Z',
+  updated_at: '2026-10-19T00:00:00Z',
+}
+
+const roles = [
+  {
+    id: 'role-developer',
+    tenant_id: tenant.id,
+    name: 'developer',
+    description: '',
+    status: 1,
+    created_at: '',
+    updated_at: '',
+  },
+  {
+    id: 'role-reviewer',
+    tenant_id: tenant.id,
+    name: 'reviewer',
+    description: '',
+    status: 1,
+    created_at: '',
+    updated_at: '',
+  },
+]
+
+interface CapturedPayloads {
+  create?: unknown
+  update?: unknown
+  roles?: unknown
+  disabled: string[]
+}
+
+async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
+  const payloads: CapturedPayloads = { disabled: [] }
+
+  await page.route('**/api/v1/users**', async (route) => {
+    const request = route.request()
+    const pathname = new URL(request.url()).pathname
+
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          data: [user],
+          total: 1,
+          page: 1,
+          page_size: 20,
+        }),
+      })
+      return
+    }
+
+    if (request.method() === 'POST' && pathname === '/api/v1/users') {
+      payloads.create = await request.postDataJSON()
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: user }),
+      })
+      return
+    }
+
+    if (request.method() === 'POST' && pathname.endsWith('/roles')) {
+      payloads.roles = await request.postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok' }),
+      })
+      return
+    }
+
+    if (request.method() === 'PUT') {
+      payloads.update = await request.postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok' }),
+      })
+      return
+    }
+
+    if (request.method() === 'DELETE') {
+      payloads.disabled.push(pathname.split('/').at(-1) ?? '')
+      await route.fulfill({ status: 204 })
+      return
+    }
+
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 5000, message: 'unexpected user request' }),
+    })
+  })
+
+  await page.route(/\/api\/v1\/tenants(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [tenant],
+        total: 1,
+        page: 1,
+        page_size: 100,
+      }),
+    }),
+  )
+
+  await page.route(/\/api\/v1\/roles(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: roles,
+        total: roles.length,
+        page: 1,
+        page_size: 100,
+      }),
+    }),
+  )
+
+  return payloads
+}
+
+test('creates a platform user inside the selected tenant', async ({ page }) => {
+  const payloads = await setupUserRoutes(page)
+  await seedSession(page)
+  await page.goto('/admin/users')
+
+  await expect(page.getByTestId('users-table')).toContainText('alice')
+  await page.getByTestId('user-create').click()
+
+  const drawer = page.locator('.el-drawer').filter({ hasText: '新建用户' })
+  await drawer
+    .locator('.el-form-item')
+    .filter({ hasText: '所属租户' })
+    .locator('.el-select__wrapper')
+    .click()
+  await page.getByRole('option', { name: 'Acme', exact: true }).click()
+  await drawer
+    .locator('.el-form-item')
+    .filter({ hasText: '角色' })
+    .locator('.el-select__wrapper')
+    .click()
+  await page.getByRole('option', { name: 'reviewer', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await drawer.getByLabel('用户名').fill('bob')
+  await drawer.getByLabel('初始密码').fill('secret123')
+  await drawer.getByLabel('邮箱').fill('bob@example.com')
+  await drawer.getByRole('button', { name: '创建用户' }).click()
+
+  await expect(page.getByText('用户已创建')).toBeVisible()
+  expect(payloads.create).toEqual({
+    tenant_id: tenant.id,
+    username: 'bob',
+    password: 'secret123',
+    email: 'bob@example.com',
+    phone: '',
+    role_ids: ['role-reviewer'],
+  })
+})
+
+test('edits, reassigns roles, and deactivates a user', async ({ page }) => {
+  const payloads = await setupUserRoutes(page)
+  await seedSession(page)
+  await page.goto('/admin/users')
+  await expect(page.getByTestId('users-table')).toContainText('alice')
+
+  await page.getByRole('button', { name: '编辑', exact: true }).click()
+  const editDrawer = page.locator('.el-drawer').filter({ hasText: '编辑用户' })
+  await editDrawer.getByLabel('邮箱').fill('updated@example.com')
+  await editDrawer.getByLabel('手机号').fill('13900000000')
+  await editDrawer
+    .locator('.el-form-item')
+    .filter({ hasText: '状态' })
+    .locator('.el-select__wrapper')
+    .click()
+  await page.getByRole('option', { name: '停用', exact: true }).click()
+  await editDrawer.getByRole('button', { name: '保存更改' }).click()
+  await expect(page.getByText('用户已更新')).toBeVisible()
+  expect(payloads.update).toEqual({
+    status: 0,
+    email: 'updated@example.com',
+    phone: '13900000000',
+  })
+
+  await page.getByRole('button', { name: '角色', exact: true }).click()
+  const roleDialog = page.locator('.el-dialog').filter({ hasText: '分配角色' })
+  await roleDialog.locator('.el-select__wrapper').click()
+  await page.getByRole('option', { name: 'reviewer', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await roleDialog.getByRole('button', { name: '保存角色' }).click()
+  await expect(page.getByText('用户角色已更新')).toBeVisible()
+  expect(payloads.roles).toEqual({ role_ids: ['role-developer', 'role-reviewer'] })
+
+  await page.getByRole('button', { name: '停用', exact: true }).click()
+  await page.locator('.el-message-box').getByRole('button', { name: '停用' }).click()
+  await expect(page.getByText('用户已停用')).toBeVisible()
+  expect(payloads.disabled).toEqual([user.id])
+})

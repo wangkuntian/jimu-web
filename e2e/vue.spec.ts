@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test'
 
 import { seedSession, ZERO_ROLE_IDENTITY } from './helpers/session'
 
-test('renders the authorized home overview', async ({ page }) => {
+test('renders the authorized admin overview', async ({ page }) => {
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   await expect(page).toHaveTitle('Jimu Hub')
   await expect(page.locator('.app-sidebar .brand-mark')).toBeVisible()
@@ -24,13 +24,14 @@ test('renders the authorized home overview', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '工作概览' })).toBeVisible()
   await expect(page.getByText('欢迎回来，admin')).toBeVisible()
   await expect(page.getByTestId('portal-role')).toHaveText('超级管理员')
-  await expect(page.getByTestId('portal-permission-count')).toHaveText('6')
+  await expect(page.getByTestId('portal-permission-count')).toHaveText('12')
   await expect(page.getByTestId('quick-tenants')).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: '用户管理', exact: true })).toBeVisible()
 })
 
 test('exposes a working skip navigation target', async ({ page }) => {
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   const skipLink = page.getByRole('link', { name: '跳到主要内容' })
   await skipLink.focus()
@@ -42,41 +43,36 @@ test('exposes a working skip navigation target', async ({ page }) => {
   await expect(page.locator('#main-content')).toBeFocused()
 })
 
-test('keeps the home overview useful for a zero-role user', async ({ page }) => {
+test('sends a zero-role user to the user workspace', async ({ page }) => {
   await seedSession(page, ZERO_ROLE_IDENTITY)
-  await page.goto('/portal')
+  await page.goto('/hub')
 
-  await expect(page.getByRole('heading', { name: '工作概览' })).toBeVisible()
-  await expect(page.getByTestId('portal-role')).toHaveText('暂未分配角色')
-  await expect(page.getByTestId('portal-permission-count')).toHaveText('0')
+  await expect(page).toHaveURL(/\/workspace$/)
+  await expect(page.getByRole('heading', { name: '业务工作区' })).toBeVisible()
+  await expect(page.locator('.topbar-current')).toHaveText('工作空间')
+  await expect(page.getByRole('menuitem', { name: '账号安全', exact: true })).toBeVisible()
   await expect(page.getByTestId('quick-tenants')).toHaveCount(0)
-  await expect(page.getByTestId('quick-workspace')).toBeVisible()
-  await expect(page.getByTestId('quick-security')).toBeVisible()
 })
 
-test('stacks the home overview without horizontal overflow on a narrow viewport', async ({
+test('keeps the admin overview without horizontal overflow on a narrow viewport', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   await expect(page.getByRole('heading', { name: '工作概览' })).toBeVisible()
   await expect(page.locator('.sidebar-menu .el-sub-menu')).toHaveCount(0)
   await expect(page.getByRole('menuitem', { name: '账号安全', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: '进入业务工作区', exact: true })).toHaveCSS(
-    'height',
-    '44px',
-  )
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(
     false,
   )
 })
 
-test('keeps the home board in two columns at the review viewport', async ({ page }) => {
+test('keeps the admin board in two columns at the review viewport', async ({ page }) => {
   await page.setViewportSize({ width: 822, height: 984 })
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   const featureBox = await page.locator('.workspace-feature').boundingBox()
   const quickBox = await page.locator('.quick-panel').boundingBox()
@@ -93,7 +89,7 @@ test('keeps the home board in two columns at the review viewport', async ({ page
 test('expands and collapses the sidebar from the topbar', async ({ page }) => {
   await page.setViewportSize({ width: 822, height: 984 })
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   const sidebar = page.locator('.app-sidebar')
   const expandButton = page.getByRole('button', { name: '展开导航' })
@@ -130,16 +126,16 @@ test('expands and collapses the sidebar from the topbar', async ({ page }) => {
 
 test('opens account actions from the avatar menu', async ({ page }) => {
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   await page.getByRole('button', { name: '打开账户菜单' }).click()
 
   const accountMenu = page.locator('.el-dropdown-menu')
   await expect(accountMenu.getByRole('menuitem', { name: '工作概览' })).toBeVisible()
-  await expect(accountMenu.getByRole('menuitem', { name: '业务工作区' })).toBeVisible()
+  await expect(accountMenu.getByRole('menuitem', { name: '切换至用户工作区' })).toBeVisible()
   await expect(accountMenu.getByRole('menuitem', { name: '账号安全' })).toBeVisible()
   await expect(accountMenu.getByRole('menuitem', { name: '退出登录' })).toBeVisible()
 
   await accountMenu.getByRole('menuitem', { name: '账号安全' }).click()
-  await expect(page).toHaveURL(/\/account\/security$/)
+  await expect(page).toHaveURL(/\/admin\/account\/security$/)
 })

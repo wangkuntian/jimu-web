@@ -4,7 +4,7 @@
 
 Jimu Hub 是 Jimu 后端配套的独立前端项目，目标是为平台管理员、租户管理员和普通业务用户提供统一入口。
 
-当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新、路由守卫、会话引导（`/auth/me`）、运行时开关的注册页和租户管理页已接入真实后端；平台侧的套餐与配额、平台级系统状态尚未实现。业务工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
+当前已建立 Vue 3 SPA、工程质量工具与认证基础：登录、会话刷新、路由守卫、会话引导（`/auth/me`）、运行时开关的注册页、双工作台分流，以及平台用户与租户管理均已接入真实后端；平台侧的套餐与配额、平台级系统状态尚未实现。用户工作区只提供可扩展的工作台壳，不虚构订单、库存、项目或内容等具体业务。
 
 ## 仓库边界
 
@@ -64,11 +64,11 @@ pnpm run dev                                 # 开发服务器 http://localhost:
 
 ### 验收路径与当前结果
 
-**注册（普通模式）→ 用新账号登录 → 租户列表**在真机上可用；**新建 / 改套餐 / 删除对运行时创建的租户当前不可用**。原因是 P1 雪花 ID 精度：后端把雪花 ID 作为 JSON number 输出（真值 `370528943163310080`），超出 JS 的 `Number.MAX_SAFE_INTEGER`（`9007199254740991`）。`JSON.parse` 存下的 double 对这些值仍然**精确**（`BigInt(parsed)` 能原样往返），错位发生在把数字序列化回 URL 路径/请求体时——`String(number)` 给出的是「最短可往返十进制」，可以不是整数本身（`370528943163310080` 序列化成 `370528943163310100`），行内动作于是打到不存在的租户 ID 上（`PUT …/plan` 还会返回静默的 `code:0`）。根因与实测见[版本日志 v0.3.0](docs/releases/v0.3.0.md)「说明」的 P1 条目。这不是「只有 `default` 可以正常操作」：实测 13 次真机运行 12 次命中，往返不丢位的 ID（如 `370531811102556160`）仍能正常完成行内动作。为杜绝静默假成功，租户页现在对 ID 超出安全整数范围的行**禁用**「编辑 / 删除 / 分配套餐」三个行内按钮，并在页面顶部用 `el-alert` 说明原因（后端改为字符串序列化后自动恢复）。
+**注册（普通模式）→ 用新账号登录 → 用户工作区**与 **admin 登录 → 租户列表 → 新建 / 改套餐 / 删除**均已在真机上打通。后端 `cf116508ba73763edcf97599a9436628ce3969b1` 起把用户、租户和角色 ID 统一按 JSON string 输出，前端同步移除了旧的安全整数守卫；雪花 ID 不再经过 JavaScript `number`，行内动作会原样使用后端返回的字符串 ID。
 
 ### 权限前提
 
-只有结构种子出来的 `admin` 有管理权限；**公开注册出来的用户零角色**——`GET /api/v1/auth/me` 返回 200 且 `roles`/`permissions` 都是空数组，但同一个 token 调 `GET /api/v1/tenants` 是 `403`（`1003`）。界面把 `403` 渲染成无权限页（「没有访问租户管理的权限」）并**留在 `/platform/tenants`**，这是设计语义，**不是会话失效**；只有 `401` 才刷新凭证或回登录页。判权只看 `permissions`，不看角色名。
+只有结构种子出来的 `admin` 有管理权限；**公开注册出来的用户零角色**——`GET /api/v1/auth/me` 返回 200 且 `roles`/`permissions` 都是空数组。零角色用户会进入 `/workspace`，直接访问 `/admin/*` 会被守卫送回用户工作区。管理面入口只由 `permissions` 决定：能读取 `/api/v1/users` 或 `/api/v1/tenants` 才显示；页面内再按具体资源和动作逐项判权。`403`（`1003`）渲染无权限态且留在当前页面，只有 `401` 才刷新凭证或回登录页。
 
 ### 可复现的端到端
 
@@ -76,9 +76,7 @@ pnpm run dev                                 # 开发服务器 http://localhost:
 E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 pnpm exec playwright test e2e/real-backend.spec.ts
 ```
 
-`e2e/real-backend.spec.ts` 由 `E2E_REAL_BACKEND=1` 门控，默认跳过（CI 上没有后端）。它分两条用例：一条真实注册 `e2e_<时间戳>` 账号，验证零角色看不到「租户管理」入口、直达 `/platform/tenants` 得到无权限页并留在该路由，再用 `admin` 确认列表渲染出真实的 `default` 行；另一条走「新建 → 分配套餐 → 删除」，断言保持严格（不降级、不删除），但因为 P1 未修而**暂时整条跳过**——用例体首句是 `test.fixme(true, 'P1: …')`，测试体不执行，真机运行结果因此固定为 `1 passed / 1 skipped`。
-
-第二条用例目前无法可靠通过：行内动作发出的 ID 被改写，套餐写入落到不存在的租户上，行内仍显示「未分配」。**跳过是确定性的**，与后端当次生成的 id 无关。上一轮曾用 Playwright 的 known-failure 标记 `test.fail(true, 'P1: …')` 跟踪同一缺陷，但该标记是否命中取决于当次生成的 id——实测 13 次真机运行 12 次命中，1 次因该 id 的最短十进制表示恰好等于自身而侥幸通过，那一次 Playwright 报 `Expected to fail, but passed` 并让套件退出码非 0，因此改用确定性的 `test.fixme`。行内动作现在还额外受安全整数检查保护（不可精确的 ID 按钮禁用），所以整条链路只能在后端把 `id` / `plan_id` 改为字符串序列化之后重新启用：同步契约（`scripts/sync-contract.sh <ref>`）→ `pnpm run api:types` → 按新类型收掉 `isPreciseId` 守卫 → 删掉 `test.fixme` 标记，届时断言应当真正通过。
+`e2e/real-backend.spec.ts` 由 `E2E_REAL_BACKEND=1` 门控，默认跳过（CI 上没有后端）。两条用例均启用：一条真实注册 `e2e_<时间戳>` 账号，验证零角色进入用户工作区且访问管理面会被送回，再用 `admin` 确认租户列表渲染出真实的 `default` 行；另一条走「新建 → 分配套餐 → 删除」，使用新的字符串 ID 契约验证完整链路。
 
 ## CLI 命令
 
@@ -141,25 +139,28 @@ CI 的 `API Contract` job 除 `pnpm run api:check` 外还运行 `scripts/check_c
 
 ## 当前 Bootstrap 范围
 
-- `/` 重定向到 `/portal`。
-- `/portal`、`/workspace`、`/account/security` 和 `/platform/tenants` 均受会话守卫保护，未登录访问会重定向到 `/login`，登录后回到原路径。
+- `/` 重定向到 `/hub`。
+- `/hub` 是多工作台选择入口；零角色用户直接进入 `/workspace`，管理员首次进入可选择用户工作区或管理控制台，之后恢复最近选择。
+- `/workspace/*` 使用 `UserLayout`，`/admin/*` 使用 `PortalLayout`；所有受保护路由未登录时重定向到 `/login`，登录后优先回到原深链接。
+- `/portal` → `/hub`、`/platform/tenants` → `/admin/tenants`、`/account/security` → `/workspace/account/security` 保留兼容重定向。
 - 会话状态由 `src/shared/auth/session.ts` 的模块级变量承载：访问令牌只驻留内存，刷新令牌存 `sessionStorage`，不落盘，也不依赖 Pinia。
 - 受保护导航前先做会话引导 `GET /auth/me`：身份（`roles`/`permissions`）只驻内存，成功才缓存；`401`/`404` 清会话回登录页，`500` 与网络错误不登出。
-- 登录页与导航项、租户页的行内动作都按 `permissions` 判权（Casbin `keyMatch` 的前端等价实现），代码里不出现角色名；`403`（`1003`）渲染无权限态且留在原路由，不触发登出。
+- 登录页、导航项、用户管理与租户管理的行内动作都按 `permissions` 判权（Casbin `keyMatch` 的前端等价实现），代码里不出现角色名；`403`（`1003`）渲染无权限态且留在原路由，不触发登出。
 - 注册入口由运行时 `GET /auth/config` 决定：`public_registration=false` 时登录页不显示入口，`/register` 渲染「注册未开放」；`provisioning_enabled=true` 才渲染租户字段。
-- `/platform/tenants` 已接入真实后端：关键字/状态/排序筛选、分页、新建、编辑、分配套餐、删除（二次确认）；不筛选状态时请求**不含** `status` 参数。
-- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；登录、注册与租户页都使用其表单、表格与提示组件。
+- `/admin/tenants` 已接入真实后端：关键字/状态/排序筛选、分页、新建、编辑、分配套餐、删除（二次确认）；不筛选状态时请求**不含** `status` 参数。
+- `/admin/users` 提供平台用户列表、用户名/租户/状态筛选、分页、新建、编辑、角色替换与停用；创建时强制选择所属租户，角色只从目标租户加载，切换租户会清空已选角色。
+- Element Plus 已接入，主题变量按 Carbon 设计 token 覆盖；认证页、双工作台、用户管理与租户管理均使用其菜单、表单、表格与提示组件。
 - API 契约转换、类型生成、格式化、lint、类型检查、单测、E2E 和构建均有独立 CLI。
 
 ## 后续首版目标
 
 ```text
 Platform
+├── 用户管理
 ├── 租户管理
 ├── 套餐与配额
 └── 平台级系统状态
 Tenant
-├── 用户管理
 ├── 角色与权限
 ├── API Key
 └── 审计日志
@@ -185,8 +186,8 @@ jimu-web/
 ├── src/
 │   ├── app/             # 应用路由与守卫
 │   ├── assets/          # 品牌标识等静态资源
-│   ├── features/        # 按用户能力组织的功能（auth：登录/注册与认证 API 封装）
-│   ├── layouts/         # AuthLayout 与 PortalLayout
+│   ├── features/        # 按用户能力组织（auth、hub、users、tenants）
+│   ├── layouts/         # AuthLayout、UserLayout 与 PortalLayout
 │   ├── shared/api/      # 生成的 API 类型、client、信封解包与载荷视图模型
 │   ├── shared/auth/     # 会话存储与刷新
 │   ├── styles/          # 全局样式与设计 token
@@ -198,9 +199,9 @@ jimu-web/
 
 ## 验证方式
 
-- Vitest 覆盖信封解包（2xx 与真实非 2xx 业务码）、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、会话引导（`401`/`404` 清会话，`500`/网络错误不登出）、权限判定（只看 `permissions`，不看角色名）、登录页错误码分支、注册页开关与载荷、租户列表 query 构造（不筛选时不传 `status`）、租户 API 与租户页四态及逐行动作判权。
-- Playwright 覆盖 `/portal` 工作概览、可展开/收起且权限驱动的侧边栏、管理员与零角色两种首页状态、822px 双栏与窄屏单列布局，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
-- Playwright 另覆盖：认证页品牌与表单状态、窄屏布局、未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示、租户列表渲染、无权限（本地缺权限与后端 `403` 两种来源）渲染无权限页且留在原路由。
+- Vitest 覆盖信封解包（2xx 与真实非 2xx 业务码）、会话读写与单飞刷新、401 重试、路由守卫与会话失效跳转、工作台判定与最近选择持久化、用户/租户/角色字符串 ID、登录页错误码分支、注册页开关与载荷、租户列表 query 构造（不筛选时不传 `status`）、用户查询与创建/编辑/角色替换/停用载荷，以及用户和租户页的权限、四态、筛选与分页纠偏。
+- Playwright 覆盖 `/hub` 分流与最近工作台恢复、管理面越权回退、旧路由重定向、管理员工作概览、用户工作区、可展开/收起且权限驱动的侧边栏、822px 双栏与窄屏单列布局，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
+- Playwright 另覆盖：认证页品牌与表单状态、窄屏布局、未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示、租户列表渲染、用户列表与创建/编辑/角色/停用交互，以及无权限（本地缺权限与后端 `403` 两种来源）渲染无权限页且留在当前页面。
 - 真机链路（真实后端）由 `E2E_REAL_BACKEND=1` 门控，见「本地真机联调」；默认不跑也不需要在 CI 上跑。
 - `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
@@ -211,6 +212,7 @@ jimu-web/
 - [Jimu Hub 前端设计（原 Jimu Portal 文档）](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)
 - [Jimu Hub 品牌命名与认证页调整](docs/superpowers/specs/2026-10-22-jimu-hub-brand-rename.md)
 - [Jimu Hub 登录后导航框架](docs/superpowers/specs/2026-10-22-jimu-hub-workspace-navigation.md)
+- [平台用户管理与双工作台设计](docs/superpowers/specs/2026-10-23-platform-user-management-design.md)
 - [设计规范 DESIGN.md](DESIGN.md)
 - [设计系统来源与 UI 规范](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)
 - [初始化实现计划](docs/superpowers/plans/2026-09-20-jimu-web-bootstrap.md)

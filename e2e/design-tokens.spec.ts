@@ -8,7 +8,7 @@ import { seedSession } from './helpers/session'
  */
 test('applies the Carbon design tokens over Element Plus', async ({ page }) => {
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   const tokens = await page.evaluate(() => {
     const styles = getComputedStyle(document.documentElement)
@@ -55,7 +55,7 @@ test('applies the Carbon design tokens over Element Plus', async ({ page }) => {
 
 test('renders the shell with Carbon tokens', async ({ page }) => {
   await seedSession(page)
-  await page.goto('/portal')
+  await page.goto('/admin')
 
   await expect(page.locator('.brand')).toHaveCSS('color', 'rgb(22, 22, 22)')
   // 品牌名走 16px 小节标题，字重封顶 600（DESIGN.md 不允许 700）

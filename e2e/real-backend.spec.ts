@@ -28,53 +28,32 @@ test('drives the real stack: register → zero-role login → admin tenant list'
   await page.getByLabel('用户名').fill(username)
   await page.getByLabel('密码').fill('secret123')
   await page.getByRole('button', { name: '登录' }).click()
-  await expect(page).toHaveURL(/\/portal$/)
-  await expect(page.getByRole('link', { name: '租户管理' })).toHaveCount(0)
-  await page.goto('/platform/tenants')
-  await expect(page).toHaveURL(/\/platform\/tenants$/)
-  await expect(page.getByText('没有访问租户管理的权限')).toBeVisible()
+  await expect(page).toHaveURL(/\/workspace$/)
+  await expect(page.getByRole('menuitem', { name: '用户管理', exact: true })).toHaveCount(0)
+  await page.goto('/admin/tenants')
+  await expect(page).toHaveURL(/\/workspace$/)
 
   // 3) admin 登录后看到真实列表。
-  // 已登录用户会被会话守卫从 /login 弹回 /portal，所以先走真实登出再换账号。
+  // 已登录用户会被会话守卫从 /login 弹回 /hub，所以先走真实登出再换账号。
   await page.getByRole('button', { name: '打开账户菜单' }).click()
   await page.getByRole('menuitem', { name: '退出登录' }).click()
   await expect(page).toHaveURL(/\/login/)
   await page.getByLabel('用户名').fill('admin')
   await page.getByLabel('密码').fill(adminPassword)
   await page.getByRole('button', { name: '登录' }).click()
+  await expect(page).toHaveURL(/\/hub$/)
+  await page.getByTestId('hub-admin').click()
+  await expect(page).toHaveURL(/\/admin$/)
   await page
     .locator('.sidebar-menu')
     .getByRole('menuitem', { name: '租户管理', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/platform\/tenants$/)
+  await expect(page).toHaveURL(/\/admin\/tenants$/)
   // el-table 会渲染 header 与 body 两个 <table>，断言落在 data-test 的容器上。
   await expect(page.getByTestId('tenants-table')).toContainText('default')
 })
 
-/**
- * P1 已知缺陷（后端，未在本轮修复）：`GET /tenants` 把雪花 ID 作为 JSON number 输出
- * （`"id":370528943163310080`），超出 JS 的 `Number.MAX_SAFE_INTEGER`（9007199254740991）；
- * JS 侧这个 id 的十进制形态是 `370528943163310100`（`JSON.parse(…).id` 取到的就是它，
- * 发回路径参数时也是它）。`TenantsView` 的行内动作都用 `row.id` 拼路径参数，于是真机上
- * 打的是不存在的租户 ID：服务端日志可见
- * `PUT /api/v1/tenants/370528943163310100/plan`，而该租户的真实 ID 是 `…080`。
- * 后端对该舍入 ID 的三种行为（实测）：`GET` → 404 `5001 租户不存在`；`DELETE` → 404 `5001`；
- * **`PUT …/plan` → `{"code":0,"message":"ok"}`**——最后一条是静默假成功，前端拿不到任何错误信号。
- * 只有种子租户 `default`（id=1）在安全整数范围内，行内动作才正常。
- * 该缺陷**数据相关、并非每次都命中**：实测 13 次真机运行 12 次命中（服务端日志里 PUT 路径
- * 的末几位被改写，真实 `…080` 发出的是 `…100`），1 次因该 id 的最短十进制表示恰好等于自身
- * 而侥幸成功。上一轮用 Playwright 的 known-failure 标记（`test.fail`）跟踪该缺陷，那次侥幸
- * 成功被报成「Expected to fail, but passed」并让套件退出码非 0——条件性标记因此换成确定性的
- * `test.fixme`：整条链路暂时跳过，与被测数据无关。
- * 下面的链路断言保持原样、不降级，只是暂时不执行；
- * 原始证据与根因见 docs/releases/v0.3.0.md「说明」的 P1 条目。
- */
-test('P1: create → assign plan → delete a runtime-created tenant', async ({ page }) => {
-  // 测试体首句：P1 修复前确定性跳过整条链路，不依赖后端当次生成的 id（known-failure 标记会翻转）。
-  test.fixme(
-    true,
-    'P1: 后端把雪花 ID 作为 JSON number 输出（如 370528943163310080），超出 JS 的 Number.MAX_SAFE_INTEGER，浏览器拿到的数字被改写成 370528943163310100，行内动作（分配套餐 / 删除）于是打到不存在的租户上；行内动作现在还额外受安全整数检查保护（不可精确的 ID 按钮禁用），因此这条链路只能在后端把 id / plan_id 序列化为 JSON string（并同步契约）之后才能执行：删掉本行 test.fixme 即可重新启用整条链路。',
-  )
+test('create → assign plan → delete a runtime-created tenant', async ({ page }) => {
   const suffix = Date.now().toString(36)
   const tenantCode = `e2e_${suffix}`
 
@@ -82,8 +61,13 @@ test('P1: create → assign plan → delete a runtime-created tenant', async ({ 
   await page.getByLabel('用户名').fill('admin')
   await page.getByLabel('密码').fill(adminPassword)
   await page.getByRole('button', { name: '登录' }).click()
-  await page.getByRole('link', { name: '租户管理' }).click()
-  await expect(page).toHaveURL(/\/platform\/tenants$/)
+  await expect(page).toHaveURL(/\/hub$/)
+  await page.getByTestId('hub-admin').click()
+  await page
+    .locator('.sidebar-menu')
+    .getByRole('menuitem', { name: '租户管理', exact: true })
+    .click()
+  await expect(page).toHaveURL(/\/admin\/tenants$/)
   await expect(page.getByTestId('tenants-table')).toContainText('default')
 
   // 新建 → 改套餐 → 删除（删除走确认框）
