@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveGuardNavigation, resolveSessionNavigation } from '../../src/app/guards/session'
 import { ensureIdentity } from '../../src/shared/auth/identity'
-import { clearIdentity, clearSession, hasSession, saveSession } from '../../src/shared/auth/session'
+import {
+  clearIdentity,
+  clearSession,
+  hasSession,
+  saveIdentity,
+  saveSession,
+} from '../../src/shared/auth/session'
 
 vi.mock('../../src/shared/auth/identity', () => ({ ensureIdentity: vi.fn() }))
 
@@ -33,13 +39,13 @@ describe('resolveSessionNavigation', () => {
   it('allows protected routes when a session exists', () => {
     saveSession({ access_token: 'a1', refresh_token: 'r1', expires_in: 1800 })
 
-    expect(resolveSessionNavigation(route('/portal'))).toBe(true)
+    expect(resolveSessionNavigation(route('/hub'))).toBe(true)
   })
 
   it('sends an authenticated user away from the login page', () => {
     saveSession({ access_token: 'a1', refresh_token: 'r1', expires_in: 1800 })
 
-    expect(resolveSessionNavigation(route('/login', true))).toEqual({ path: '/portal' })
+    expect(resolveSessionNavigation(route('/login', true))).toEqual({ path: '/hub' })
   })
 })
 
@@ -101,6 +107,54 @@ describe('resolveGuardNavigation', () => {
 
     await expect(
       resolveGuardNavigation({ path: '/login', fullPath: '/login', meta: { public: true } }),
-    ).resolves.toEqual({ path: '/portal' })
+    ).resolves.toEqual({ path: '/hub' })
+  })
+
+  it('keeps a user without admin read permissions out of the admin surface', async () => {
+    saveSession(tokens)
+    ensureIdentityMock.mockResolvedValue('ok')
+    saveIdentity({
+      user: {
+        id: 11,
+        username: 'newcomer',
+        status: 1,
+        tenant_id: 1,
+        created_at: '2026-10-19T00:00:00Z',
+      },
+      roles: [],
+      permissions: [],
+    })
+
+    await expect(
+      resolveGuardNavigation({
+        path: '/admin/users',
+        fullPath: '/admin/users',
+        meta: { requiresAdmin: true },
+      }),
+    ).resolves.toEqual({ path: '/workspace' })
+  })
+
+  it('allows an admin surface route with users GET permission', async () => {
+    saveSession(tokens)
+    ensureIdentityMock.mockResolvedValue('ok')
+    saveIdentity({
+      user: {
+        id: 1,
+        username: 'admin',
+        status: 1,
+        tenant_id: 1,
+        created_at: '2026-10-19T00:00:00Z',
+      },
+      roles: [],
+      permissions: [{ resource: '/api/v1/users', action: 'GET' }],
+    })
+
+    await expect(
+      resolveGuardNavigation({
+        path: '/admin/users',
+        fullPath: '/admin/users',
+        meta: { requiresAdmin: true },
+      }),
+    ).resolves.toBe(true)
   })
 })

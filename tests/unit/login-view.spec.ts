@@ -159,7 +159,7 @@ describe('LoginView', () => {
     expect(wrapper.find('[data-test="totp"]').exists()).toBe(true)
   })
 
-  it('ignores an off-site redirect target and falls back to the portal', async () => {
+  it('ignores an off-site redirect target and falls back to the hub', async () => {
     const router = createTestRouter()
     await router.push({ path: '/login', query: { redirect: '//evil.example' } })
     await router.isReady()
@@ -180,7 +180,7 @@ describe('LoginView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(router.currentRoute.value.path).toBe('/portal')
+    expect(router.currentRoute.value.path).toBe('/hub')
   })
 
   it('hides the register entry when public registration is closed', async () => {

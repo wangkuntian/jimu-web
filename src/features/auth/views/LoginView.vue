@@ -79,7 +79,7 @@ async function onSubmit(): Promise<void> {
     await router.push(
       typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
         ? redirect
-        : '/portal',
+        : '/hub',
     )
   } catch (error) {
     await handleError(error)

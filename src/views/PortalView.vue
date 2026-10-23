@@ -42,7 +42,7 @@ const canViewTenants = computed(() => hasPermission(apiResource('/tenants'), 'GE
             v-if="canViewTenants"
             class="action-link secondary-action"
             data-test="portal-manage-tenants"
-            to="/platform/tenants"
+            to="/admin/tenants"
           >
             管理租户
             <ArrowUpRight :size="16" aria-hidden="true" />
@@ -86,7 +86,7 @@ const canViewTenants = computed(() => hasPermission(apiResource('/tenants'), 'GE
             <ArrowUpRight class="quick-arrow" :size="16" aria-hidden="true" />
           </RouterLink>
 
-          <RouterLink class="quick-link" data-test="quick-security" to="/account/security">
+          <RouterLink class="quick-link" data-test="quick-security" to="/admin/account/security">
             <span class="quick-icon">
               <ShieldCheck :size="18" aria-hidden="true" />
             </span>
@@ -101,7 +101,7 @@ const canViewTenants = computed(() => hasPermission(apiResource('/tenants'), 'GE
             v-if="canViewTenants"
             class="quick-link"
             data-test="quick-tenants"
-            to="/platform/tenants"
+            to="/admin/tenants"
           >
             <span class="quick-icon">
               <Building2 :size="18" aria-hidden="true" />

@@ -2,14 +2,15 @@ import type { NavigationGuard } from 'vue-router'
 
 import { ensureIdentity } from '../../shared/auth/identity'
 import { clearSession, hasSession } from '../../shared/auth/session'
+import { canAccessAdminSurface } from '../../shared/auth/surfaces'
 
 export const LOGIN_ROUTE = '/login'
-export const DEFAULT_AUTHENTICATED_ROUTE = '/portal'
+export const DEFAULT_AUTHENTICATED_ROUTE = '/hub'
 
 interface GuardTarget {
   path: string
   fullPath: string
-  meta: { public?: boolean }
+  meta: { public?: boolean; requiresAdmin?: boolean }
 }
 
 export type SessionNavigation = true | { path: string; query?: Record<string, string> }
@@ -41,15 +42,27 @@ export function resolveSessionNavigation(to: GuardTarget): SessionNavigation {
  * 页面渲染时 hasPermission 就已经有数据。失败不拦：'unavailable' 只是后端抖动。
  */
 export async function resolveGuardNavigation(to: GuardTarget): Promise<SessionNavigation> {
+  let identityStatus: Awaited<ReturnType<typeof ensureIdentity>> | null = null
+
   if (hasSession()) {
-    const status = await ensureIdentity()
-    if (status === 'unauthenticated') {
+    identityStatus = await ensureIdentity()
+    if (identityStatus === 'unauthenticated') {
       // 守卫自己会导航，所以用 clearSession 而不是 expireSession，避免订阅二次跳转。
       clearSession()
     }
   }
 
-  return resolveSessionNavigation(to)
+  const navigation = resolveSessionNavigation(to)
+  if (navigation !== true) {
+    return navigation
+  }
+
+  // 身份不可用时不据此收权：管理页会渲染身份错误态，恢复后仍可重试。
+  if (identityStatus === 'ok' && to.meta.requiresAdmin === true && !canAccessAdminSurface()) {
+    return { path: '/workspace' }
+  }
+
+  return true
 }
 
 /**
@@ -60,5 +73,8 @@ export const sessionGuard: NavigationGuard = (to) =>
   resolveGuardNavigation({
     path: to.path,
     fullPath: to.fullPath,
-    meta: { public: to.meta.public === true },
+    meta: {
+      public: to.meta.public === true,
+      requiresAdmin: to.meta.requiresAdmin === true,
+    },
   })

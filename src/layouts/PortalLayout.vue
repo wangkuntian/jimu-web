@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Building2, House, LayoutGrid, LogOut, PanelLeft, ShieldCheck } from '@lucide/vue'
+import { Building2, House, LayoutGrid, LogOut, PanelLeft, ShieldCheck, Users } from '@lucide/vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 
 import { LOGIN_ROUTE } from '../app/guards/session'
@@ -30,21 +30,21 @@ const menuCollapsed = computed(() => !isMobileViewport.value && sidebarCollapsed
 
 const identity = computed(() => getIdentity())
 const username = computed(() => identity.value?.user.username ?? '用户')
-const primaryRole = computed(() => identity.value?.roles[0] ?? '未分配角色')
 const initials = computed(() => Array.from(username.value).slice(0, 1).join('').toUpperCase())
 const currentPageLabel = computed(() =>
-  typeof route.meta.navLabel === 'string' ? route.meta.navLabel : '工作空间',
+  typeof route.meta.navLabel === 'string' ? route.meta.navLabel : '管理控制台',
 )
 
 // 导航项按权限隐藏；无权限时入口不出现，但路由本身仍可直达（页面会渲染无权限态）。
+const canViewUsers = computed(() => hasPermission(apiResource('/users'), 'GET'))
 const canViewTenants = computed(() => hasPermission(apiResource('/tenants'), 'GET'))
 const navigationItems = computed(() => [
-  { index: '/portal', label: '工作概览', icon: House },
-  { index: '/workspace', label: '业务工作区', icon: LayoutGrid },
-  { index: '/account/security', label: '账号安全', icon: ShieldCheck },
+  { index: '/admin', label: '工作概览', icon: House },
+  ...(canViewUsers.value ? [{ index: '/admin/users', label: '用户管理', icon: Users }] : []),
   ...(canViewTenants.value
-    ? [{ index: '/platform/tenants', label: '租户管理', icon: Building2 }]
+    ? [{ index: '/admin/tenants', label: '租户管理', icon: Building2 }]
     : []),
+  { index: '/admin/account/security', label: '账号安全', icon: ShieldCheck },
 ])
 
 function onViewportChange(event: MediaQueryListEvent): void {
@@ -78,11 +78,11 @@ async function onAccountCommand(command: string): Promise<void> {
   }
 
   if (command === 'home') {
-    await router.push('/portal')
+    await router.push('/admin')
   } else if (command === 'workspace') {
     await router.push('/workspace')
   } else if (command === 'security') {
-    await router.push('/account/security')
+    await router.push('/admin/account/security')
   }
 }
 </script>
@@ -92,7 +92,7 @@ async function onAccountCommand(command: string): Promise<void> {
 
   <el-container class="app-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed }">
     <el-aside id="primary-sidebar" class="app-sidebar">
-      <RouterLink class="brand" aria-label="Jimu Hub 工作概览" to="/portal">
+      <RouterLink class="brand" aria-label="Jimu Hub 管理控制台" to="/admin">
         <img :src="jimuMark" class="brand-mark" alt="" aria-hidden="true" />
         <span class="brand-text">Jimu Hub</span>
       </RouterLink>
@@ -120,14 +120,9 @@ async function onAccountCommand(command: string): Promise<void> {
         </el-menu>
       </el-scrollbar>
 
-      <div class="sidebar-account" :title="`${username} · ${primaryRole}`">
+      <div class="sidebar-account" :title="username">
         <el-dropdown trigger="click" placement="top-end" @command="onAccountCommand">
-          <el-button
-            class="account-trigger"
-            text
-            :aria-label="'打开账户菜单'"
-            :title="`${username} · ${primaryRole}`"
-          >
+          <el-button class="account-trigger" text :aria-label="'打开账户菜单'" :title="username">
             <el-avatar class="account-avatar" :size="36" aria-hidden="true">
               {{ initials }}
             </el-avatar>
@@ -144,7 +139,7 @@ async function onAccountCommand(command: string): Promise<void> {
               <el-dropdown-item command="workspace">
                 <span class="account-menu-label">
                   <LayoutGrid :size="16" aria-hidden="true" />
-                  业务工作区
+                  切换至用户工作区
                 </span>
               </el-dropdown-item>
               <el-dropdown-item command="security">
@@ -165,7 +160,6 @@ async function onAccountCommand(command: string): Promise<void> {
 
         <span class="account-copy">
           <strong>{{ username }}</strong>
-          <span>{{ primaryRole }}</span>
         </span>
       </div>
     </el-aside>
@@ -387,8 +381,7 @@ async function onAccountCommand(command: string): Promise<void> {
   min-width: 0;
 }
 
-.account-copy strong,
-.account-copy span {
+.account-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -398,11 +391,6 @@ async function onAccountCommand(command: string): Promise<void> {
   color: var(--jp-color-text);
   font-size: var(--jp-font-size-body);
   font-weight: var(--jp-font-weight-emphasis);
-}
-
-.account-copy span {
-  color: var(--jp-color-text-muted);
-  font-size: var(--jp-font-size-caption);
 }
 
 .account-menu-label {

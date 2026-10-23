@@ -54,7 +54,7 @@ describe('PortalView', () => {
     expect(wrapper.find('[data-test="quick-tenants"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="quick-workspace"]').attributes('href')).toBe('/workspace')
     expect(wrapper.find('[data-test="quick-security"]').attributes('href')).toBe(
-      '/account/security',
+      '/admin/account/security',
     )
   })
 

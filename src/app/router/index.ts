@@ -8,7 +8,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/portal',
+      redirect: '/hub',
     },
     {
       path: LOGIN_ROUTE,
@@ -23,36 +23,70 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/hub',
+      name: 'hub',
+      component: () => import('../../features/hub/views/HubView.vue'),
+    },
+    {
       path: '/portal',
-      name: 'portal',
-      component: () => import('../../layouts/PortalLayout.vue'),
+      redirect: '/hub',
+    },
+    {
+      path: '/workspace',
+      component: () => import('../../layouts/UserLayout.vue'),
       children: [
         {
           path: '',
-          name: 'portal-home',
+          name: 'workspace',
+          component: () => import('../../views/WorkspaceView.vue'),
+          meta: { navLabel: '工作空间' },
+        },
+        {
+          path: 'account/security',
+          name: 'workspace-account-security',
+          component: () => import('../../views/AccountSecurityView.vue'),
+          meta: { navLabel: '账号安全' },
+        },
+      ],
+    },
+    {
+      path: '/admin',
+      component: () => import('../../layouts/PortalLayout.vue'),
+      meta: { requiresAdmin: true },
+      children: [
+        {
+          path: '',
+          name: 'admin-home',
           component: () => import('../../views/PortalView.vue'),
           meta: { navLabel: '工作概览' },
         },
         {
-          path: '/workspace',
-          name: 'workspace',
-          component: () => import('../../views/WorkspaceView.vue'),
-          meta: { navLabel: '业务工作区' },
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('../../features/users/views/UsersView.vue'),
+          meta: { navLabel: '用户管理' },
         },
         {
-          path: '/account/security',
-          name: 'account-security',
-          component: () => import('../../views/AccountSecurityView.vue'),
-          meta: { navLabel: '账号安全' },
-        },
-        {
-          // 不加权限守卫：无权限用户必须能进入并看到无权限页，而不是被重定向。
-          path: '/platform/tenants',
-          name: 'platform-tenants',
+          path: 'tenants',
+          name: 'admin-tenants',
           component: () => import('../../features/tenants/views/TenantsView.vue'),
           meta: { navLabel: '租户管理' },
         },
+        {
+          path: 'account/security',
+          name: 'admin-account-security',
+          component: () => import('../../views/AccountSecurityView.vue'),
+          meta: { navLabel: '账号安全' },
+        },
       ],
+    },
+    {
+      path: '/platform/tenants',
+      redirect: '/admin/tenants',
+    },
+    {
+      path: '/account/security',
+      redirect: '/workspace/account/security',
     },
   ],
 })
