@@ -11,7 +11,7 @@ import {
   listTenants,
   updateTenant,
 } from '../api'
-import { buildTenantListQuery, clampPage, isPreciseId } from '../params'
+import { buildTenantListQuery, clampPage } from '../params'
 import type { TenantFilters } from '../params'
 import { resolvePlanName } from '../plan-name'
 import { apiResource } from '../../../shared/api/config'
@@ -69,12 +69,6 @@ const listError = computed(() => {
 
 const listErrorMessage = computed(() => listError.value?.message ?? '加载租户列表失败')
 const listErrorRequestId = computed(() => listError.value?.requestId ?? '')
-
-/** ID 超出安全整数范围时，行内写操作会打到错误的租户上，页面顶部统一提示一次。 */
-const hasImpreciseId = computed(() => items.value.some((row) => !isPreciseId(row.id)))
-
-const IMPRECISE_ID_HINT =
-  '后端以 JSON number 输出超出 JS 安全整数范围的 ID，写操作已禁用（改为字符串序列化后自动恢复，见版本日志 v0.3.0 的 P1 说明）'
 
 /**
  * 互斥状态，判定顺序即优先级：
@@ -140,10 +134,6 @@ function applyKeyword(): void {
 /** 身份引导重试：成功后 canView 变为 true，列表查询会自动放行。 */
 async function retryIdentity(): Promise<void> {
   await ensureIdentity()
-}
-
-function rowActionHint(row: Tenant): string | undefined {
-  return isPreciseId(row.id) ? undefined : IMPRECISE_ID_HINT
 }
 
 function canUpdate(row: Tenant): boolean {
@@ -214,8 +204,8 @@ async function submitCreate(): Promise<void> {
 }
 
 const editVisible = ref(false)
-const editForm = reactive<{ id: number; name: string; status: 0 | 1 }>({
-  id: 0,
+const editForm = reactive<{ id: string; name: string; status: 0 | 1 }>({
+  id: '',
   name: '',
   status: 1,
 })
@@ -225,7 +215,7 @@ const editRequestId = ref('')
 const canSubmitEdit = computed(() => editForm.name.trim() !== '')
 
 const { isPending: updating, mutateAsync: updateTenantAsync } = useMutation({
-  mutationFn: (input: { id: number; name: string; status: 0 | 1 }) =>
+  mutationFn: (input: { id: string; name: string; status: 0 | 1 }) =>
     updateTenant(input.id, { name: input.name, status: input.status }),
   onSuccess: invalidateList,
 })
@@ -259,8 +249,8 @@ async function submitEdit(): Promise<void> {
 }
 
 const planVisible = ref(false)
-const planForm = reactive<{ id: number; code: string; planId: number }>({
-  id: 0,
+const planForm = reactive<{ id: string; code: string; planId: number }>({
+  id: '',
   code: '',
   planId: 0,
 })
@@ -268,7 +258,7 @@ const planError = ref('')
 const planRequestId = ref('')
 
 const { isPending: assigning, mutateAsync: assignPlanAsync } = useMutation({
-  mutationFn: (input: { id: number; planId: number }) => assignTenantPlan(input.id, input.planId),
+  mutationFn: (input: { id: string; planId: number }) => assignTenantPlan(input.id, input.planId),
   onSuccess: invalidateList,
 })
 
@@ -297,7 +287,7 @@ async function submitPlan(): Promise<void> {
 }
 
 const { mutateAsync: deleteTenantAsync } = useMutation({
-  mutationFn: (id: number) => deleteTenant(id),
+  mutationFn: (id: string) => deleteTenant(id),
   onSuccess: invalidateList,
 })
 
@@ -413,16 +403,6 @@ async function onDelete(row: Tenant): Promise<void> {
         </el-button>
       </div>
 
-      <el-alert
-        v-if="hasImpreciseId"
-        data-test="tenants-imprecise-id"
-        class="tenants-id-warning"
-        type="warning"
-        :closable="false"
-        show-icon
-        title="部分租户的行内操作已禁用——后端以 JSON number 输出超出 JS 安全整数范围的 ID，改为字符串序列化后自动恢复（见版本日志 v0.3.0 的 P1 说明）"
-      />
-
       <div v-if="viewState === 'loading'" class="tenants-state">
         <el-skeleton data-test="tenants-loading" :rows="4" animated />
       </div>
@@ -466,9 +446,6 @@ async function onDelete(row: Tenant): Promise<void> {
                   v-if="canUpdate(scope.row)"
                   text
                   type="primary"
-                  :disabled="!isPreciseId(scope.row.id)"
-                  :title="rowActionHint(scope.row)"
-                  :aria-label="rowActionHint(scope.row)"
                   @click="openEdit(scope.row)"
                 >
                   编辑
@@ -477,9 +454,6 @@ async function onDelete(row: Tenant): Promise<void> {
                   v-if="canDelete(scope.row)"
                   text
                   type="danger"
-                  :disabled="!isPreciseId(scope.row.id)"
-                  :title="rowActionHint(scope.row)"
-                  :aria-label="rowActionHint(scope.row)"
                   @click="onDelete(scope.row)"
                 >
                   删除
@@ -488,9 +462,6 @@ async function onDelete(row: Tenant): Promise<void> {
                   v-if="canAssignPlan(scope.row)"
                   text
                   type="primary"
-                  :disabled="!isPreciseId(scope.row.id)"
-                  :title="rowActionHint(scope.row)"
-                  :aria-label="rowActionHint(scope.row)"
                   @click="openPlan(scope.row)"
                 >
                   分配套餐
@@ -609,10 +580,6 @@ async function onDelete(row: Tenant): Promise<void> {
 
 .tenants-state {
   margin-top: 24px;
-}
-
-.tenants-id-warning {
-  margin-top: 16px;
 }
 
 .tenants-retry {

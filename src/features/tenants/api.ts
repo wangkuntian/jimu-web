@@ -56,7 +56,7 @@ export async function createTenant(input: TenantCreateInput): Promise<Tenant> {
 }
 
 /** 更新名称或状态；编码不在契约的更新字段里。响应没有 data 键，用 unwrapOk。 */
-export async function updateTenant(id: number, input: TenantUpdateInput): Promise<void> {
+export async function updateTenant(id: string, input: TenantUpdateInput): Promise<void> {
   const { data, error, response } = await api.PUT('/tenants/{id}', {
     params: { path: { id } },
     body: input,
@@ -65,13 +65,13 @@ export async function updateTenant(id: number, input: TenantUpdateInput): Promis
 }
 
 /** 删除租户；默认租户受后端保护（409 + 5003），前端不做预判。 */
-export async function deleteTenant(id: number): Promise<void> {
+export async function deleteTenant(id: string): Promise<void> {
   const { data, error, response } = await api.DELETE('/tenants/{id}', { params: { path: { id } } })
   unwrapOk(resolveEnvelope({ data, error, response }))
 }
 
 /** 分配套餐；plan_id=0 表示取消套餐，请求体必须保留这个 0。 */
-export async function assignTenantPlan(id: number, planId: number): Promise<void> {
+export async function assignTenantPlan(id: string, planId: number): Promise<void> {
   const { data, error, response } = await api.PUT('/tenants/{id}/plan', {
     params: { path: { id } },
     body: { plan_id: planId },

@@ -49,5 +49,24 @@ export interface RegisterResult {
 /** 租户；契约 application.TenantResponse。 */
 export type Tenant = Required<Schemas['application.TenantResponse']>
 
+/** 租户引用；契约 application.TenantRef。 */
+export type TenantRef = Required<Schemas['application.TenantRef']>
+
+/** 角色引用；契约 application.RoleRef。 */
+export type RoleRef = Required<Schemas['application.RoleRef']>
+
+/** 角色；契约 application.RoleResponse。 */
+export type Role = Required<Schemas['application.RoleResponse']>
+
+/** 用户；契约 application.UserResponse，嵌套引用补齐为业务必填字段。 */
+export type User = Omit<Required<Schemas['application.UserResponse']>, 'roles' | 'tenant'> & {
+  roles: RoleRef[]
+  tenant: TenantRef
+}
+
+export type CreateUserInput = Schemas['application.CreateUserRequest']
+export type UpdateUserInput = Schemas['application.UpdateUserRequest']
+export type AssignUserRolesInput = Schemas['application.AssignUserRolesRequest']
+
 /** 套餐；契约 application.PlanResponse。 */
 export type Plan = Required<Schemas['application.PlanResponse']>

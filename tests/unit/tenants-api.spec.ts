@@ -35,7 +35,7 @@ describe('tenants api', () => {
         message: 'ok',
         data: [
           {
-            id: 1,
+            id: '1',
             code: 'default',
             name: '默认租户',
             status: 1,
@@ -55,7 +55,7 @@ describe('tenants api', () => {
     await expect(listTenants(query)).resolves.toEqual({
       items: [
         {
-          id: 1,
+          id: '1',
           code: 'default',
           name: '默认租户',
           status: 1,
@@ -134,7 +134,7 @@ describe('tenants api', () => {
       data: {
         code: 0,
         data: {
-          id: 4,
+          id: '4',
           code: 'acme',
           name: 'Acme',
           status: 1,
@@ -147,7 +147,7 @@ describe('tenants api', () => {
     })
 
     await expect(createTenant({ code: 'acme', name: 'Acme' })).resolves.toMatchObject({
-      id: 4,
+      id: '4',
       code: 'acme',
     })
     expect(postMock).toHaveBeenCalledWith('/tenants', { body: { code: 'acme', name: 'Acme' } })
@@ -160,7 +160,7 @@ describe('tenants api', () => {
       response: new Response(null, { status: 200 }),
     })
 
-    await expect(updateTenant(4, { name: 'Acme 2', status: 0 })).resolves.toBeUndefined()
+    await expect(updateTenant('4', { name: 'Acme 2', status: 0 })).resolves.toBeUndefined()
   })
 
   it('surfaces the conflict when the default tenant refuses deletion', async () => {
@@ -169,7 +169,7 @@ describe('tenants api', () => {
       response: new Response(null, { status: 409 }),
     })
 
-    await expect(deleteTenant(1)).rejects.toMatchObject({
+    await expect(deleteTenant('1')).rejects.toMatchObject({
       code: 5003,
       message: '默认租户不可删除',
       requestId: 'req-3',
@@ -184,7 +184,7 @@ describe('tenants api', () => {
       response: new Response(null, { status: 409 }),
     })
 
-    await expect(deleteTenant(1)).rejects.toMatchObject({
+    await expect(deleteTenant('1')).rejects.toMatchObject({
       code: 5003,
       message: '默认租户不可删除',
       requestId: 'req-10',
@@ -197,10 +197,25 @@ describe('tenants api', () => {
       response: new Response(null, { status: 200 }),
     })
 
-    await expect(assignTenantPlan(4, 0)).resolves.toBeUndefined()
+    await expect(assignTenantPlan('4', 0)).resolves.toBeUndefined()
     expect(putMock).toHaveBeenCalledWith('/tenants/{id}/plan', {
-      params: { path: { id: 4 } },
+      params: { path: { id: '4' } },
       body: { plan_id: 0 },
+    })
+  })
+
+  it('keeps a large tenant id as the exact string returned by the backend', async () => {
+    const id = '370528943163310080'
+    putMock.mockResolvedValueOnce({
+      data: { code: 0, message: 'ok' },
+      response: new Response(null, { status: 200 }),
+    })
+
+    await updateTenant(id, { name: '运行时租户' })
+
+    expect(putMock).toHaveBeenCalledWith('/tenants/{id}', {
+      params: { path: { id } },
+      body: { name: '运行时租户' },
     })
   })
 })

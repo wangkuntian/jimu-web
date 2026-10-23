@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildTenantListQuery, clampPage, isPreciseId } from '../../src/features/tenants/params'
+import { buildTenantListQuery, clampPage } from '../../src/features/tenants/params'
 import type { TenantFilters } from '../../src/features/tenants/params'
 
 const base: TenantFilters = {
@@ -69,23 +69,5 @@ describe('clampPage', () => {
 
   it('still returns 1 when the page size exceeds the total', () => {
     expect(clampPage(4, 100, 25)).toBe(1)
-  })
-})
-
-describe('isPreciseId', () => {
-  it('accepts safe integers', () => {
-    expect(isPreciseId(1)).toBe(true)
-    expect(isPreciseId(Number.MAX_SAFE_INTEGER)).toBe(true)
-  })
-
-  it('rejects snowflake ids that exceed the safe integer range', () => {
-    // `Number('...')` 就是 JSON.parse 对后端 number id 得到的结果（370528943163310100）。
-    expect(isPreciseId(Number('370528943163310080'))).toBe(false)
-    expect(isPreciseId(Number.MAX_SAFE_INTEGER + 1)).toBe(false)
-  })
-
-  it('rejects non-integers', () => {
-    expect(isPreciseId(1.5)).toBe(false)
-    expect(isPreciseId(Number.NaN)).toBe(false)
   })
 })

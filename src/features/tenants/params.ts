@@ -61,15 +61,3 @@ export function clampPage(page: number, pageSize: number, total: number): number
   const lastPage = Math.max(1, Math.ceil(total / pageSize))
   return Math.min(Math.max(1, page), lastPage)
 }
-
-/**
- * 租户 ID 是否落在 JS 安全整数范围内。
- *
- * 后端把雪花 ID 作为 JSON number 输出时，超出 `Number.MAX_SAFE_INTEGER` 的值会被
- * JSON.parse 成相邻的 double，再用 `String(...)` 拼回路径参数时可能被改写成另一个数字。
- * 这类 ID 的行内写操作会打到不存在的租户上，甚至拿到 `code:0` 的假成功——因此只允许
- * 精确可往返的 ID 发起写请求，不做 BigInt 补偿。
- */
-export function isPreciseId(id: number): boolean {
-  return Number.isSafeInteger(id)
-}

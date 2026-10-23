@@ -32,7 +32,7 @@ const listTenantsMock = vi.mocked(listTenants)
 const listPlansMock = vi.mocked(listPlans)
 
 const tenant = {
-  id: 1,
+  id: '1',
   code: 'default',
   name: '默认租户',
   status: 1,
@@ -87,8 +87,8 @@ const rowAdminIdentity: Identity = {
   ],
 }
 
-/** 后端以 JSON number 输出的雪花 ID：`Number(...)` 就是 JSON.parse 之后浏览器看到的 double。 */
-const impreciseTenantId = Number('370528943163310080')
+/** 后端以字符串输出的雪花 ID；路由与请求体必须原样保留，不能转回 number。 */
+const largeTenantId = '370528943163310080'
 
 function buttonByText(wrapper: ReturnType<typeof mountView>, text: string) {
   return wrapper.findAll('button').find((button) => button.text() === text)
@@ -294,12 +294,10 @@ describe('TenantsView', () => {
     expect(listTenantsMock.mock.calls.map(([query]) => query.page)).toContain(3)
   })
 
-  it('disables row actions and warns when a row id is not a safe integer', async () => {
-    // P1：后端把雪花 ID 作为 JSON number 输出，浏览器拿到的是被改写的 double。
-    // 写操作会打到不存在的租户上（PUT /plan 还会返回 code:0 的假成功），所以按钮必须禁用。
+  it('keeps row actions enabled for a large string id', async () => {
     saveIdentity(rowAdminIdentity)
     listTenantsMock.mockResolvedValue({
-      items: [{ ...tenant, id: impreciseTenantId, code: 'runtime', name: '运行时租户' }],
+      items: [{ ...tenant, id: largeTenantId, code: 'runtime', name: '运行时租户' }],
       total: 1,
       page: 1,
       pageSize: 20,
@@ -307,12 +305,12 @@ describe('TenantsView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
-    expect(wrapper.find('[data-test="tenants-imprecise-id"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="tenants-imprecise-id"]').exists()).toBe(false)
 
     for (const label of ['编辑', '删除', '分配套餐']) {
       const button = buttonByText(wrapper, label)
       expect(button).toBeDefined()
-      expect(button?.attributes('disabled')).toBeDefined()
+      expect(button?.attributes('disabled')).toBeUndefined()
     }
   })
 
