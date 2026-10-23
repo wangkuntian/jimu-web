@@ -49,10 +49,10 @@
 - Produces: generated `application.UserResponse`, `application.UserPageResponse`, `application.RoleResponse`, `application.AssignUserRolesRequest`.
 - Produces: `Tenant.id: string`, `Role.id: string`, `User.id: string`.
 
-- [ ] Run `bash scripts/sync-contract.sh cf116508ba73763edcf97599a9436628ce3969b1`.
-- [ ] Run `pnpm run api:types` and inspect generated User/Role schema names.
-- [ ] Update tenant API signatures and UI code from numeric IDs to string IDs; remove `isPreciseId` guards caused by the old numeric serialization.
-- [ ] Run focused tenant tests and `pnpm run typecheck`.
+- [x] Run `bash scripts/sync-contract.sh cf116508ba73763edcf97599a9436628ce3969b1`.
+- [x] Run `pnpm run api:types` and inspect generated User/Role schema names.
+- [x] Update tenant API signatures and UI code from numeric IDs to string IDs; remove `isPreciseId` guards caused by the old numeric serialization.
+- [x] Run focused tenant tests and `pnpm run typecheck`.
 
 ### Task 2: Add Workspace Surface Resolution
 
@@ -69,9 +69,9 @@
 - Produces: `readLastSurface(): AppSurface | null`
 - Produces: `rememberSurface(surface: AppSurface): void`
 
-- [ ] Write failing tests for admin access from `/api/v1/users` or `/api/v1/tenants` and last-surface persistence.
-- [ ] Implement surface helpers using `hasPermission(apiResource(...), 'GET')`.
-- [ ] Run `pnpm exec vitest run tests/unit/surfaces.spec.ts`.
+- [x] Write failing tests for admin access from `/api/v1/users` or `/api/v1/tenants` and last-surface persistence.
+- [x] Implement surface helpers using `hasPermission(apiResource(...), 'GET')`.
+- [x] Run `pnpm exec vitest run tests/unit/surfaces.spec.ts`.
 
 ### Task 3: Split Protected Routes and Add Hub
 
@@ -93,9 +93,9 @@
 - Produces routes: `/hub`, `/workspace`, `/workspace/account/security`, `/admin`, `/admin/users`, `/admin/tenants`, `/admin/account/security`.
 - Produces redirects: `/portal` → `/hub`, `/platform/tenants` → `/admin/tenants`, `/account/security` → `/workspace/account/security`.
 
-- [ ] Write failing tests for surface redirects, legacy redirects, and login default target `/hub`.
-- [ ] Implement route trees, `HubView`, `UserLayout`, admin navigation changes, and login default.
-- [ ] Run focused unit tests and verify direct deep links still win over `/hub`.
+- [x] Write failing tests for surface redirects, legacy redirects, and login default target `/hub`.
+- [x] Implement route trees, `HubView`, `UserLayout`, admin navigation changes, and login default.
+- [x] Run focused unit tests and verify direct deep links still win over `/hub`.
 
 ### Task 4: Add User Query and API Layer
 
@@ -112,9 +112,9 @@
 - Produces: `UserFilters`, `buildUserListQuery(filters)`.
 - Produces: `listUsers`, `getUser`, `createUser`, `updateUser`, `disableUser`, `assignUserRoles`, `listRoles`, `listTenantOptions`.
 
-- [ ] Write failing tests for query omission, string IDs, create payload, role replacement, and 204 disable response.
-- [ ] Implement API functions with the existing envelope helpers and Vue Query-compatible return shapes.
-- [ ] Run the two focused test files.
+- [x] Write failing tests for query omission, string IDs, create payload, role replacement, and 204 disable response.
+- [x] Implement API functions with the existing envelope helpers and Vue Query-compatible return shapes.
+- [x] Run the two focused test files.
 
 ### Task 5: Build User List and Filters
 
@@ -128,9 +128,9 @@
 - Consumes: Task 4 API functions and `UserFilters`.
 - Produces: permission-aware list, filters, pagination, loading/error/empty/forbidden states.
 
-- [ ] Write failing tests for list rendering, tenant/status filters, permission-hidden actions, and stale-page correction.
-- [ ] Implement the list and filter bar with Element Plus and Vue Query.
-- [ ] Run `pnpm exec vitest run tests/unit/users-view.spec.ts`.
+- [x] Write failing tests for list rendering, tenant/status filters, permission-hidden actions, and stale-page correction.
+- [x] Implement the list and filter bar with Element Plus and Vue Query.
+- [x] Run `pnpm exec vitest run tests/unit/users-view.spec.ts`.
 
 ### Task 6: Add Create, Edit, Role Assignment, and Disable
 
@@ -144,9 +144,9 @@
 - Consumes: all Task 4 mutations.
 - Produces: create drawer with required tenant and tenant-scoped roles, edit drawer, role dialog, disable confirmation.
 
-- [ ] Write failing tests for tenant-required create, role reset on tenant change, edit payload, role replacement, and disable confirmation.
-- [ ] Implement the interaction states with Element Plus.
-- [ ] Run focused unit tests.
+- [x] Write failing tests for tenant-required create, role reset on tenant change, edit payload, role replacement, and disable confirmation.
+- [x] Implement the interaction states with Element Plus.
+- [x] Run focused unit tests.
 
 ### Task 7: E2E, Documentation, and Release Notes
 
@@ -162,11 +162,11 @@
 
 - Consumes: all routes and page APIs from Tasks 1–6.
 
-- [ ] Add Playwright coverage for `/hub`, surface redirects, legacy redirects, `/admin/users` list, create, edit, role assignment, and disable.
-- [ ] Update existing tests for `/admin/*` and string ID fixtures.
-- [ ] Update README routes and verification coverage.
-- [ ] Update release notes.
-- [ ] Run `pnpm run check` and `pnpm run test:e2e`.
+- [x] Add Playwright coverage for `/hub`, surface redirects, legacy redirects, `/admin/users` list, create, edit, role assignment, and disable.
+- [x] Update existing tests for `/admin/*` and string ID fixtures.
+- [x] Update README routes and verification coverage.
+- [x] Update release notes.
+- [x] Run `pnpm run check` and `pnpm run test:e2e`.
 
 ## Self-Review
 
