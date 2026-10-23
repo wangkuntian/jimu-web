@@ -18,6 +18,17 @@ export type IdentityState = IdentityStatus | 'unknown'
 
 const identityStatus = shallowRef<IdentityState>('unknown')
 
+type SessionClearedHandler = () => void
+const sessionClearedHandlers = new Set<SessionClearedHandler>()
+
+/** 清理会话时同步丢弃与服务端身份绑定的缓存。 */
+export function onSessionCleared(handler: SessionClearedHandler): () => void {
+  sessionClearedHandlers.add(handler)
+  return () => {
+    sessionClearedHandlers.delete(handler)
+  }
+}
+
 export function getIdentityStatus(): IdentityState {
   return identityStatus.value
 }
@@ -87,6 +98,9 @@ export function clearSession(): void {
   identity.value = null
   identityStatus.value = 'unknown'
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+  for (const handler of sessionClearedHandlers) {
+    handler()
+  }
 }
 
 type SessionExpiredHandler = () => void

@@ -6,7 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import HubView from '../../src/features/hub/views/HubView.vue'
 import type { Identity } from '../../src/shared/api/types'
 import { rememberSurface } from '../../src/shared/auth/surfaces'
-import { clearIdentity, saveIdentity } from '../../src/shared/auth/session'
+import { clearIdentity, saveIdentity, setIdentityStatus } from '../../src/shared/auth/session'
 
 const workspaceIdentity: Identity = {
   user: {
@@ -87,5 +87,13 @@ describe('HubView', () => {
 
     expect(router.currentRoute.value.path).toBe('/admin')
     expect(localStorage.getItem('jimu.last_surface')).toBe('admin')
+  })
+
+  it('keeps the hub available when identity loading is temporarily unavailable', async () => {
+    setIdentityStatus('unavailable')
+    const { router, wrapper } = await mountHub()
+
+    expect(router.currentRoute.value.path).toBe('/hub')
+    expect(wrapper.find('[data-test="hub-identity-error"]').exists()).toBe(true)
   })
 })

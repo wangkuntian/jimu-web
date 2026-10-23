@@ -108,6 +108,15 @@ const viewerIdentity: Identity = {
   permissions: [{ resource: '/api/v1/users', action: 'GET' }],
 }
 
+const tenantUserAdminIdentity: Identity = {
+  ...baseIdentity,
+  permissions: [
+    { resource: '/api/v1/users', action: 'GET' },
+    { resource: '/api/v1/users', action: 'POST' },
+    { resource: '/api/v1/roles', action: 'GET' },
+  ],
+}
+
 function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number): void {
   const pagination = wrapper.findComponent('[data-test="users-pagination"]') as VueWrapper
   pagination.vm.$emit('update:current-page', page)
@@ -360,6 +369,34 @@ describe('UsersView', () => {
         }),
       ),
     )
+  })
+
+  it('creates a user inside the current tenant when tenant listing is not permitted', async () => {
+    saveIdentity(tenantUserAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await wrapper.find('[data-test="user-create"]').trigger('click')
+
+    expect(wrapper.find('[data-test="user-create-tenant"]').exists()).toBe(false)
+    await vi.waitFor(() => expect(listRolesMock).toHaveBeenCalledWith(undefined))
+
+    await wrapper.find('input[data-test="user-create-username"]').setValue('bob')
+    await wrapper.find('input[data-test="user-create-password"]').setValue('secret123')
+    const roleSelect = wrapper.findComponent('[data-test="user-create-roles"]') as VueWrapper
+    roleSelect.vm.$emit('update:modelValue', [role.id])
+    await wrapper.find('[data-test="user-create-submit"]').trigger('click')
+
+    await vi.waitFor(() =>
+      expect(createUserMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          username: 'bob',
+          role_ids: [role.id],
+        }),
+      ),
+    )
+    expect(createUserMock.mock.lastCall?.[0]).not.toHaveProperty('tenant_id')
   })
 
   it('edits the mutable profile fields', async () => {

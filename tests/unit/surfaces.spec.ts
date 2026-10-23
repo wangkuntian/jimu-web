@@ -5,6 +5,7 @@ import {
   canAccessWorkspace,
   readLastSurface,
   rememberSurface,
+  rememberSurfaceForPath,
 } from '../../src/shared/auth/surfaces'
 import type { Identity } from '../../src/shared/api/types'
 import { clearIdentity, saveIdentity } from '../../src/shared/auth/session'
@@ -62,6 +63,18 @@ describe('workspace surfaces', () => {
     expect(readLastSurface()).toBe('workspace')
 
     localStorage.setItem('jimu.last_surface', 'unknown')
+    expect(readLastSurface()).toBeNull()
+  })
+
+  it('remembers the surface reached by a deep link or account-menu switch', () => {
+    rememberSurfaceForPath('/admin/users')
+    expect(readLastSurface()).toBe('admin')
+
+    rememberSurfaceForPath('/workspace/account/security')
+    expect(readLastSurface()).toBe('workspace')
+
+    localStorage.clear()
+    rememberSurfaceForPath('/hub')
     expect(readLastSurface()).toBeNull()
   })
 })

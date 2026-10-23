@@ -22,6 +22,9 @@ test('lets an administrator choose and restore a workspace', async ({ page }) =>
   await page.getByRole('button', { name: '打开账户菜单' }).click()
   await page.getByRole('menuitem', { name: '切换至管理控制台' }).click()
   await expect(page).toHaveURL(/\/admin$/)
+
+  await page.goto('/hub')
+  await expect(page).toHaveURL(/\/admin$/)
 })
 
 test('does not leave a zero-role user on the admin surface', async ({ page }) => {

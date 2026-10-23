@@ -164,6 +164,31 @@ describe('users api', () => {
     })
   })
 
+  it('lets the backend resolve the current tenant when no tenant id is supplied', async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        code: 0,
+        data: [],
+        total: 0,
+        page: 1,
+        page_size: 100,
+      },
+      response: new Response(null, { status: 200 }),
+    })
+
+    await expect(listRoles()).resolves.toEqual([])
+    expect(getMock).toHaveBeenCalledWith('/roles', {
+      params: {
+        query: {
+          page: 1,
+          page_size: 100,
+          sort: 'id',
+          order: 'asc',
+        },
+      },
+    })
+  })
+
   it('loads tenant options from the first 100 tenants', async () => {
     getMock.mockResolvedValueOnce({
       data: {
@@ -190,5 +215,91 @@ describe('users api', () => {
     expect(getMock).toHaveBeenCalledWith('/tenants', {
       params: { query: { page: 1, page_size: 100, sort: 'id', order: 'asc' } },
     })
+  })
+
+  it('loads every tenant option page when the total exceeds 100', async () => {
+    getMock
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          data: [
+            { ...user.tenant, code: 'acme', status: 1, plan_id: 0, created_at: '', updated_at: '' },
+          ],
+          total: 101,
+          page: 1,
+          page_size: 100,
+        },
+        response: new Response(null, { status: 200 }),
+      })
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          data: [
+            {
+              id: 'tenant-101',
+              code: 'last',
+              name: 'Last',
+              status: 1,
+              plan_id: 0,
+              created_at: '',
+              updated_at: '',
+            },
+          ],
+          total: 101,
+          page: 2,
+          page_size: 100,
+        },
+        response: new Response(null, { status: 200 }),
+      })
+
+    await expect(listTenantOptions()).resolves.toHaveLength(2)
+    expect(getMock.mock.calls.map(([, init]) => init.params.query.page)).toEqual([1, 2])
+  })
+
+  it('loads every role option page when the total exceeds 100', async () => {
+    getMock
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          data: [
+            {
+              id: 'r1',
+              tenant_id: 't1',
+              name: 'developer',
+              description: '',
+              status: 1,
+              created_at: '',
+              updated_at: '',
+            },
+          ],
+          total: 101,
+          page: 1,
+          page_size: 100,
+        },
+        response: new Response(null, { status: 200 }),
+      })
+      .mockResolvedValueOnce({
+        data: {
+          code: 0,
+          data: [
+            {
+              id: 'r101',
+              tenant_id: 't1',
+              name: 'last',
+              description: '',
+              status: 1,
+              created_at: '',
+              updated_at: '',
+            },
+          ],
+          total: 101,
+          page: 2,
+          page_size: 100,
+        },
+        response: new Response(null, { status: 200 }),
+      })
+
+    await expect(listRoles('t1')).resolves.toHaveLength(2)
+    expect(getMock.mock.calls.map(([, init]) => init.params.query.page)).toEqual([1, 2])
   })
 })

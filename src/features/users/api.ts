@@ -10,6 +10,24 @@ export interface UserPage {
   pageSize: number
 }
 
+const OPTION_PAGE_SIZE = 100
+
+async function loadAllOptionPages<T>(
+  loadPage: (page: number) => Promise<{ items: T[]; total: number }>,
+): Promise<T[]> {
+  const items: T[] = []
+  let page = 1
+
+  while (true) {
+    const result = await loadPage(page)
+    items.push(...result.items)
+    if (result.items.length === 0 || page * OPTION_PAGE_SIZE >= result.total) {
+      return items
+    }
+    page += 1
+  }
+}
+
 export async function listUsers(query: UserListQuery): Promise<UserPage> {
   const { data, error, response } = await api.GET('/users', { params: { query } })
   const envelope = unwrapEnvelope(resolveEnvelope({ data, error, response }))
@@ -64,30 +82,41 @@ export async function assignUserRoles(id: string, roleIds: string[]): Promise<vo
   unwrapOk(resolveEnvelope({ data, error, response }))
 }
 
-export async function listRoles(tenantId: string): Promise<Role[]> {
-  const { data, error, response } = await api.GET('/roles', {
-    params: {
-      query: {
-        page: 1,
-        page_size: 100,
-        sort: 'id',
-        order: 'asc',
-        tenant_id: tenantId,
+/** tenantId 为空时由后端按当前登录身份解析租户。 */
+export async function listRoles(tenantId?: string): Promise<Role[]> {
+  return loadAllOptionPages(async (page) => {
+    const { data, error, response } = await api.GET('/roles', {
+      params: {
+        query: {
+          page,
+          page_size: OPTION_PAGE_SIZE,
+          sort: 'id',
+          order: 'asc',
+          ...(tenantId === undefined ? {} : { tenant_id: tenantId }),
+        },
       },
-    },
-  })
-  const envelope = unwrapEnvelope(resolveEnvelope({ data, error, response }))
+    })
+    const envelope = unwrapEnvelope(resolveEnvelope({ data, error, response }))
 
-  return unwrap<Role[]>(envelope)
+    return {
+      items: unwrap<Role[]>(envelope),
+      total: envelope.total ?? 0,
+    }
+  })
 }
 
 export async function listTenantOptions(): Promise<Tenant[]> {
-  const { data, error, response } = await api.GET('/tenants', {
-    params: {
-      query: { page: 1, page_size: 100, sort: 'id', order: 'asc' },
-    },
-  })
-  const envelope = unwrapEnvelope(resolveEnvelope({ data, error, response }))
+  return loadAllOptionPages(async (page) => {
+    const { data, error, response } = await api.GET('/tenants', {
+      params: {
+        query: { page, page_size: OPTION_PAGE_SIZE, sort: 'id', order: 'asc' },
+      },
+    })
+    const envelope = unwrapEnvelope(resolveEnvelope({ data, error, response }))
 
-  return unwrap<Tenant[]>(envelope)
+    return {
+      items: unwrap<Tenant[]>(envelope),
+      total: envelope.total ?? 0,
+    }
+  })
 }

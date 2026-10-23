@@ -2,7 +2,7 @@ import type { NavigationGuard } from 'vue-router'
 
 import { ensureIdentity } from '../../shared/auth/identity'
 import { clearSession, hasSession } from '../../shared/auth/session'
-import { canAccessAdminSurface } from '../../shared/auth/surfaces'
+import { canAccessAdminSurface, rememberSurfaceForPath } from '../../shared/auth/surfaces'
 
 export const LOGIN_ROUTE = '/login'
 export const DEFAULT_AUTHENTICATED_ROUTE = '/hub'
@@ -60,6 +60,10 @@ export async function resolveGuardNavigation(to: GuardTarget): Promise<SessionNa
   // 身份不可用时不据此收权：管理页会渲染身份错误态，恢复后仍可重试。
   if (identityStatus === 'ok' && to.meta.requiresAdmin === true && !canAccessAdminSurface()) {
     return { path: '/workspace' }
+  }
+
+  if (identityStatus === 'ok') {
+    rememberSurfaceForPath(to.path)
   }
 
   return true

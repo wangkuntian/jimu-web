@@ -52,6 +52,7 @@ describe('resolveSessionNavigation', () => {
 describe('resolveGuardNavigation', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
     clearIdentity()
     ensureIdentityMock.mockReset()
   })
@@ -156,5 +157,31 @@ describe('resolveGuardNavigation', () => {
         meta: { requiresAdmin: true },
       }),
     ).resolves.toBe(true)
+    expect(localStorage.getItem('jimu.last_surface')).toBe('admin')
+  })
+
+  it('remembers the user workspace after a successful deep link', async () => {
+    saveSession(tokens)
+    ensureIdentityMock.mockResolvedValue('ok')
+    saveIdentity({
+      user: {
+        id: 11,
+        username: 'newcomer',
+        status: 1,
+        tenant_id: 1,
+        created_at: '2026-10-19T00:00:00Z',
+      },
+      roles: [],
+      permissions: [],
+    })
+
+    await expect(
+      resolveGuardNavigation({
+        path: '/workspace/account/security',
+        fullPath: '/workspace/account/security',
+        meta: {},
+      }),
+    ).resolves.toBe(true)
+    expect(localStorage.getItem('jimu.last_surface')).toBe('workspace')
   })
 })

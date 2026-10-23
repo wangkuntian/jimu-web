@@ -1,5 +1,7 @@
 import { QueryClient } from '@tanstack/vue-query'
 
+import { onSessionCleared } from '../shared/auth/session'
+
 /**
  * 列表/详情共用的 QueryClient。
  *
@@ -11,3 +13,10 @@ export const queryClient = new QueryClient({
     queries: { retry: false, staleTime: 30_000, refetchOnWindowFocus: false },
   },
 })
+
+/** 服务端数据缓存与账号绑定；清理会话时一并丢弃，避免跨账号展示旧租户数据。 */
+export function registerQueryCacheReset(): () => void {
+  return onSessionCleared(() => {
+    queryClient.clear()
+  })
+}

@@ -24,3 +24,12 @@ export function readLastSurface(): AppSurface | null {
 export function rememberSurface(surface: AppSurface): void {
   localStorage.setItem(LAST_SURFACE_KEY, surface)
 }
+
+/** 深链接和账户菜单切换都算一次工作台使用，供下次进入 `/hub` 恢复。 */
+export function rememberSurfaceForPath(path: string): void {
+  if (path === '/admin' || path.startsWith('/admin/')) {
+    rememberSurface('admin')
+  } else if (path === '/workspace' || path.startsWith('/workspace/')) {
+    rememberSurface('workspace')
+  }
+}

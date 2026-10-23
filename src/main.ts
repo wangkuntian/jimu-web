@@ -9,7 +9,9 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 
 import App from './App.vue'
 import router from './app/router'
-import { queryClient } from './app/query'
+import { queryClient, registerQueryCacheReset } from './app/query'
+
+registerQueryCacheReset()
 
 const app = createApp(App)
 

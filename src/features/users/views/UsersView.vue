@@ -53,11 +53,13 @@ const tenantOptionsQuery = useQuery({
   enabled: canListTenants,
 })
 
-const roleTenantId = ref('')
+const roleTenantId = ref<string | undefined>(undefined)
 const rolesQuery = useQuery({
   queryKey: ['user-role-options', roleTenantId],
   queryFn: () => listRoles(roleTenantId.value),
-  enabled: computed(() => canListRoles.value && roleTenantId.value !== ''),
+  enabled: computed(
+    () => canListRoles.value && (!canListTenants.value || roleTenantId.value !== undefined),
+  ),
 })
 
 const items = computed<User[]>(() => usersQuery.data.value?.items ?? [])
@@ -166,7 +168,7 @@ const createForm = reactive({
 })
 const canSubmitCreate = computed(
   () =>
-    createForm.tenantId !== '' &&
+    (!canListTenants.value || createForm.tenantId !== '') &&
     createForm.username.trim().length >= 3 &&
     createForm.password.length >= 6,
 )
@@ -174,7 +176,7 @@ const canSubmitCreate = computed(
 const { isPending: creating, mutateAsync: createUserAsync } = useMutation({
   mutationFn: () =>
     createUser({
-      tenant_id: createForm.tenantId,
+      ...(canListTenants.value ? { tenant_id: createForm.tenantId } : {}),
       username: createForm.username.trim(),
       password: createForm.password,
       email: createForm.email.trim(),
@@ -193,13 +195,13 @@ function openCreate(): void {
   createForm.roleIds = []
   createError.value = ''
   createRequestId.value = ''
-  roleTenantId.value = ''
+  roleTenantId.value = undefined
   createVisible.value = true
 }
 
 function onTargetTenantChange(): void {
   createForm.roleIds = []
-  roleTenantId.value = createForm.tenantId
+  roleTenantId.value = createForm.tenantId === '' ? undefined : createForm.tenantId
 }
 
 async function submitCreate(): Promise<void> {
@@ -534,7 +536,7 @@ async function onDisable(row: User): Promise<void> {
       <p v-if="createRequestId" class="request-id">请求编号：{{ createRequestId }}</p>
 
       <el-form class="user-form" label-position="top" @submit.prevent="submitCreate">
-        <el-form-item label="所属租户" required>
+        <el-form-item v-if="canListTenants" label="所属租户" required>
           <el-select
             v-model="createForm.tenantId"
             placeholder="请选择所属租户"
@@ -592,7 +594,7 @@ async function onDisable(row: User): Promise<void> {
             placeholder="选择角色"
             data-test="user-create-roles"
             :loading="rolesQuery.isPending.value"
-            :disabled="createForm.tenantId === ''"
+            :disabled="canListTenants && createForm.tenantId === ''"
           >
             <el-option
               v-for="roleOption in roles"
