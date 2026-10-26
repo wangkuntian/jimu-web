@@ -1030,9 +1030,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.PermissionPageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1096,7 +1102,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "204":
           description: 删除成功，无返回内容
@@ -1125,7 +1131,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 成功，返回权限信息
@@ -1164,7 +1170,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -1232,11 +1238,21 @@ paths:
           name: order
           schema:
             type: string
-        - description: 租户 ID（平台级视角可筛选；租户级视角必须与当前租户一致）
+        - description: 目标租户 ID；省略时跨租户查询
           in: query
           name: tenant_id
           schema:
             type: string
+        - description: 角色名称模糊匹配
+          in: query
+          name: keyword
+          schema:
+            type: string
+        - description: 状态（0=停用 1=启用）
+          in: query
+          name: status
+          schema:
+            type: integer
       responses:
         "200":
           description: 成功，返回分页角色列表
@@ -1246,6 +1262,12 @@ paths:
                 $ref: "#/components/schemas/application.RolePageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1262,13 +1284,13 @@ paths:
       tags:
         - 角色管理
     post:
-      description: 创建新角色。角色名称必须唯一，用于权限管理和访问控制。
+      description: 创建新角色。平台管理员必须传 tenant_id；首版角色接口仅平台管理员可用。租户内角色名唯一。
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/application.CreateRoleRequest"
-        description: 角色信息（名称和描述）
+        description: 角色信息（租户、名称和描述）
         required: true
       responses:
         "201":
@@ -1279,6 +1301,18 @@ paths:
                 $ref: "#/components/schemas/application.RoleBodyResponse"
         "400":
           description: 参数错误（如名称为空）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 租户不存在
           content:
             application/json:
               schema:
@@ -1302,7 +1336,7 @@ paths:
         - 角色管理
   "/roles/{id}":
     delete:
-      description: 软删除指定角色。删除后角色数据仍保留在数据库中，但无法分配给用户。
+      description: 停用指定角色（status=0）。可通过更新接口将 status 设为 1 重新启用。
       parameters:
         - description: 角色 ID
           in: path
@@ -1319,6 +1353,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
         "500":
           description: 服务器内部错误
           content:
@@ -1331,7 +1377,7 @@ paths:
       tags:
         - 角色管理
     get:
-      description: 根据角色 ID 获取角色详细信息，包括关联的权限列表。
+      description: 根据角色 ID 获取角色详细信息。权限列表由 GET /roles/{id}/permissions 单独读取。
       parameters:
         - description: 角色 ID
           in: path
@@ -1348,6 +1394,12 @@ paths:
                 $ref: "#/components/schemas/application.RoleBodyResponse"
         "400":
           description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1370,7 +1422,7 @@ paths:
       tags:
         - 角色管理
     put:
-      description: 更新指定角色的名称或描述。
+      description: 更新指定角色的名称、描述或状态。tenant_id 不可修改。
       parameters:
         - description: 角色 ID
           in: path
@@ -1394,6 +1446,12 @@ paths:
                 $ref: "#/components/schemas/response.Body"
         "400":
           description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1422,8 +1480,53 @@ paths:
       tags:
         - 角色管理
   "/roles/{id}/permissions":
+    get:
+      description: 返回指定角色当前已分配的权限。没有权限时返回空数组。
+      parameters:
+        - description: 角色 ID
+          in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功，返回角色权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/application.PermissionListResponse"
+        "400":
+          description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "500":
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+      security:
+        - BearerAuth: []
+      summary: 获取角色当前权限
+      tags:
+        - 角色管理
     post:
-      description: 为指定角色分配权限。传入权限 ID 数组，角色将被赋予这些权限。原有权限会被替换。
+      description: 整体替换角色权限。权限 ID 使用字符串；空数组表示清空该角色权限。
       parameters:
         - description: 角色 ID
           in: path
@@ -1447,6 +1550,18 @@ paths:
                 $ref: "#/components/schemas/response.Body"
         "400":
           description: 参数错误（ID 格式无效或权限不存在）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问或无权授予指定权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 角色不存在
           content:
             application/json:
               schema:
@@ -2223,7 +2338,7 @@ components:
       properties:
         permission_ids:
           items:
-            type: integer
+            type: string
           type: array
       required:
         - permission_ids
@@ -2296,6 +2411,8 @@ components:
           type: string
         name:
           type: string
+        tenant_id:
+          type: string
       required:
         - name
       type: object
@@ -2362,9 +2479,54 @@ components:
         user:
           $ref: "#/components/schemas/application.MeUser"
       type: object
+    application.PermissionListResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.PermissionResponse"
+          type: array
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.PermissionPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.PermissionResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
     application.PermissionPoint:
       properties:
         action:
+          type: string
+        resource:
+          type: string
+      type: object
+    application.PermissionResponse:
+      properties:
+        action:
+          type: string
+        created_at:
+          type: string
+        id:
+          type: string
+        name:
           type: string
         resource:
           type: string
@@ -2583,6 +2745,11 @@ components:
           type: string
         name:
           type: string
+        status:
+          enum:
+            - 0
+            - 1
+          type: integer
       required:
         - name
       type: object
