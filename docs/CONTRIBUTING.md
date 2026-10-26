@@ -21,7 +21,8 @@ pnpm run dev             # http://localhost:5173，/api 代理到本地后端
 与后端 `jimu` 的纵向需求按 [jimu 跨仓协作工作流](https://github.com/wangkuntian/jimu/blob/master/docs/design/cross-repo-development.md)执行：
 
 - 后端 API、权限和错误码以 `jimu` 为准，前端不复制或猜测领域规则。
-- 后端契约形成可获取的提交后，运行 `scripts/sync-contract.sh <sha>` 固定契约并生成类型。
+- 契约冻结是唯一串行点；前端等待可获取的 `contract-sha`，不等待后端业务实现完成。
+- 后端契约形成可获取的提交后，运行 `scripts/sync-contract.sh <contract-sha>` 固定契约并生成类型。
 - 前端只修改页面、交互和 API 消费逻辑；`src/shared/api/generated.ts` 保持派生文件身份。
 - 跨仓任务使用该工作流中的任务模板，并分别汇报两端验证结果。
 
