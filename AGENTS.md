@@ -22,6 +22,7 @@
 
 - 项目定位、技术栈、CLI 命令、目录结构和 OpenAPI 流程见 [README.md](README.md)；前端设计方向见 [Jimu Hub 前端设计（原 Jimu Portal 文档）](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)。
 - 设计 token、色板来源与 UI 规范见 [DESIGN.md](DESIGN.md)；选型理由与被否决的候选见[设计系统来源与 UI 规范](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)。
+- 与 `jimu` 的跨仓任务必须先读[跨仓协作工作流](https://github.com/wangkuntian/jimu/blob/master/docs/design/cross-repo-development.md)（本地为 `../jimu/docs/design/cross-repo-development.md`），按其中任务模板和契约顺序执行。
 - 分支、PR、CI、发布与版本日志流程见 [贡献指南](docs/CONTRIBUTING.md)；首次克隆后运行 `pnpm run hooks:install` 启用 commit-msg 钩子。
 - 修改代码、脚本或目录约定后，必须同步更新 README.md 对应章节。
 - 分支名沿用后端约定：`feature/<issue>-<slug>`，全小写短横线格式；`master` 有分支保护（`protect master`），只能经 PR 合入。
