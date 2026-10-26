@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import TenantsView from '../../src/features/tenants/views/TenantsView.vue'
+import ManagementPage from '../../src/shared/components/ManagementPage.vue'
 import { listPlans, listTenants } from '../../src/features/tenants/api'
 import { ApiError, ErrorCode } from '../../src/shared/api/unwrap'
 import { clearIdentity, saveIdentity, setIdentityStatus } from '../../src/shared/auth/session'
@@ -184,6 +185,7 @@ describe('TenantsView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    expect(wrapper.findComponent(ManagementPage).exists()).toBe(true)
     expect(wrapper.text()).toContain('default')
     expect(wrapper.text()).toContain('默认租户')
     expect(wrapper.text()).toContain('专业版')

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import UsersView from '../../src/features/users/views/UsersView.vue'
+import ManagementPage from '../../src/shared/components/ManagementPage.vue'
 import {
   createUser,
   disableUser,
@@ -197,6 +198,7 @@ describe('UsersView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    expect(wrapper.findComponent(ManagementPage).exists()).toBe(true)
     expect(wrapper.text()).toContain('alice')
     expect(wrapper.text()).toContain('alice@example.com')
     expect(wrapper.text()).toContain('Acme')

@@ -20,6 +20,7 @@ import { ApiError, ErrorCode } from '../../../shared/api/unwrap'
 import type { Role, Tenant, User } from '../../../shared/api/types'
 import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
+import ManagementPage from '../../../shared/components/ManagementPage.vue'
 import { clampPage } from '../../tenants/params'
 
 const canView = computed(() => hasPermission(apiResource('/users'), 'GET'))
@@ -342,428 +343,335 @@ async function onDisable(row: User): Promise<void> {
 </script>
 
 <template>
-  <section class="users-page" aria-labelledby="users-title">
-    <header class="users-heading">
-      <div>
-        <p class="eyebrow">Platform</p>
-        <h1 id="users-title">用户管理</h1>
-        <p class="page-lead">管理平台用户、所属租户与访问角色。</p>
-      </div>
-    </header>
+  <ManagementPage
+    v-model:page="filters.page"
+    title="用户管理"
+    description="管理平台用户、所属租户与访问角色。"
+    title-id="users-title"
+    test-id-prefix="users"
+    :state="viewState"
+    forbidden-title="没有访问用户管理的权限"
+    forbidden-description="请让管理员为你的账号分配 /api/v1/users 的 GET 权限"
+    :error-message="listErrorMessage"
+    :error-request-id="listErrorRequestId"
+    empty-description="没有找到符合条件的用户"
+    :total="total"
+    :page-size="filters.pageSize"
+    @retry-identity="retryIdentity"
+    @retry-list="usersQuery.refetch()"
+    @filter-submit="applyKeyword"
+  >
+    <template #filters>
+      <el-form-item label="用户名">
+        <el-input
+          v-model="keywordDraft"
+          class="management-filter-input"
+          clearable
+          placeholder="搜索用户名"
+          data-test="user-username-filter"
+          @keyup.enter="applyKeyword"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+      </el-form-item>
 
-    <div v-if="viewState === 'forbidden'" class="users-state">
-      <el-result
-        data-test="users-forbidden"
-        icon="warning"
-        title="没有访问用户管理的权限"
-        sub-title="请让管理员为你的账号分配 /api/v1/users 的 GET 权限"
-      />
-    </div>
+      <el-form-item v-if="canListTenants" label="租户">
+        <el-select
+          v-model="filters.tenantId"
+          class="management-filter-select"
+          clearable
+          placeholder="全部租户"
+          data-test="user-tenant-filter"
+          @change="resetPage"
+        >
+          <el-option
+            v-for="tenantOption in tenants"
+            :key="tenantOption.id"
+            :label="tenantOption.name"
+            :value="tenantOption.id"
+          />
+        </el-select>
+      </el-form-item>
 
-    <div
-      v-else-if="viewState === 'identity-error'"
-      class="users-state"
-      data-test="users-identity-error"
-    >
-      <el-alert
-        type="error"
-        :closable="false"
-        show-icon
-        title="无法确认你的身份"
-        description="后端暂时不可用，读不到当前账号的身份与权限。这不代表权限被移除，请稍后重试。"
-      />
-      <el-button class="users-retry" data-test="users-identity-retry" @click="retryIdentity">
-        重试
-      </el-button>
-    </div>
+      <el-form-item label="状态">
+        <el-select
+          v-model="filters.status"
+          class="management-filter-select management-filter-select--narrow"
+          placeholder="全部状态"
+          data-test="user-status-filter"
+          @change="resetPage"
+        >
+          <el-option label="全部状态" value="" />
+          <el-option label="启用" :value="1" />
+          <el-option label="停用" :value="0" />
+        </el-select>
+      </el-form-item>
 
-    <template v-else>
-      <el-form class="users-filters" inline @submit.prevent="applyKeyword">
-        <el-form-item label="用户名">
-          <el-input
-            v-model="keywordDraft"
-            class="users-username-input"
-            clearable
-            placeholder="搜索用户名"
-            data-test="user-username-filter"
-            @keyup.enter="applyKeyword"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-
-        <el-form-item v-if="canListTenants" label="租户">
-          <el-select
-            v-model="filters.tenantId"
-            class="users-select"
-            clearable
-            placeholder="全部租户"
-            data-test="user-tenant-filter"
-            @change="resetPage"
-          >
-            <el-option
-              v-for="tenantOption in tenants"
-              :key="tenantOption.id"
-              :label="tenantOption.name"
-              :value="tenantOption.id"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="状态">
-          <el-select
-            v-model="filters.status"
-            class="users-select users-status-select"
-            placeholder="全部状态"
-            data-test="user-status-filter"
-            @change="resetPage"
-          >
-            <el-option label="全部状态" value="" />
-            <el-option label="启用" :value="1" />
-            <el-option label="停用" :value="0" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button data-test="user-search" @click="applyKeyword">搜索</el-button>
-          <el-button
-            v-if="canCreate && viewState === 'table'"
-            type="primary"
-            data-test="user-create"
-            @click="openCreate"
-          >
-            新建用户
-          </el-button>
-        </el-form-item>
-      </el-form>
-
-      <div v-if="viewState === 'loading'" class="users-state">
-        <el-skeleton data-test="users-loading" :rows="5" animated />
-      </div>
-
-      <div v-else-if="viewState === 'error'" class="users-state" data-test="users-error">
-        <el-alert type="error" :closable="false" show-icon :title="listErrorMessage" />
-        <p v-if="listErrorRequestId" class="request-id">请求编号：{{ listErrorRequestId }}</p>
-        <el-button class="users-retry" @click="usersQuery.refetch()">重试</el-button>
-      </div>
-
-      <div v-else-if="viewState === 'empty'" class="users-state">
-        <el-empty data-test="users-empty" description="没有找到符合条件的用户">
-          <el-button v-if="canCreate" type="primary" data-test="user-create" @click="openCreate">
-            新建用户
-          </el-button>
-        </el-empty>
-      </div>
-
-      <template v-else>
-        <div class="users-table-scroll" data-test="users-table">
-          <el-table class="users-table" :data="items" row-key="id">
-            <el-table-column label="用户" min-width="220">
-              <template #default="scope">
-                <div class="user-identity">
-                  <strong>{{ scope.row.username }}</strong>
-                  <span v-if="scope.row.email">{{ scope.row.email }}</span>
-                </div>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="所属租户" min-width="160">
-              <template #default="scope">{{ scope.row.tenant.name }}</template>
-            </el-table-column>
-
-            <el-table-column label="角色" min-width="180">
-              <template #default="scope">{{ roleNames(scope.row) }}</template>
-            </el-table-column>
-
-            <el-table-column label="状态" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-                  {{ scope.row.status === 1 ? '启用' : '停用' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-
-            <el-table-column prop="created_at" label="创建时间" min-width="190" />
-
-            <el-table-column label="操作" min-width="220">
-              <template #default="scope">
-                <el-button
-                  v-if="canUpdate(scope.row)"
-                  text
-                  type="primary"
-                  @click="openEdit(scope.row)"
-                >
-                  编辑
-                </el-button>
-                <el-button
-                  v-if="canAssignRoles(scope.row) && canListRoles"
-                  text
-                  type="primary"
-                  @click="openRoles(scope.row)"
-                >
-                  角色
-                </el-button>
-                <el-button
-                  v-if="canDisable(scope.row) && scope.row.status === 1"
-                  text
-                  type="danger"
-                  @click="onDisable(scope.row)"
-                >
-                  停用
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <el-pagination
-          v-if="total > 0"
-          v-model:current-page="filters.page"
-          data-test="users-pagination"
-          class="users-pagination"
-          :page-size="filters.pageSize"
-          :total="total"
-          layout="prev, pager, next, total"
-          background
-        />
-      </template>
+      <el-form-item class="management-filter-actions">
+        <el-button data-test="user-search" @click="applyKeyword">搜索</el-button>
+        <el-button
+          v-if="canCreate && viewState === 'table'"
+          type="primary"
+          data-test="user-create"
+          @click="openCreate"
+        >
+          新建用户
+        </el-button>
+      </el-form-item>
     </template>
 
-    <el-drawer v-model="createVisible" title="新建用户" size="480px" data-test="user-create-drawer">
-      <el-alert v-if="createError" type="error" :closable="false" show-icon :title="createError" />
-      <p v-if="createRequestId" class="request-id">请求编号：{{ createRequestId }}</p>
+    <template #table>
+      <el-table class="users-table" :data="items" row-key="id">
+        <el-table-column label="用户" min-width="220">
+          <template #default="scope">
+            <div class="user-identity">
+              <strong>{{ scope.row.username }}</strong>
+              <span v-if="scope.row.email">{{ scope.row.email }}</span>
+            </div>
+          </template>
+        </el-table-column>
 
-      <el-form class="user-form" label-position="top" @submit.prevent="submitCreate">
-        <el-form-item v-if="canListTenants" label="所属租户" required>
-          <el-select
-            v-model="createForm.tenantId"
-            placeholder="请选择所属租户"
-            data-test="user-create-tenant"
-            :loading="tenantOptionsQuery.isPending.value"
-            @change="onTargetTenantChange"
-          >
-            <el-option
-              v-for="tenantOption in tenants"
-              :key="tenantOption.id"
-              :label="tenantOption.name"
-              :value="tenantOption.id"
-            />
-          </el-select>
-        </el-form-item>
+        <el-table-column label="所属租户" min-width="160">
+          <template #default="scope">{{ scope.row.tenant.name }}</template>
+        </el-table-column>
 
-        <el-form-item label="用户名" required>
-          <el-input
-            v-model="createForm.username"
-            maxlength="64"
-            autocomplete="off"
-            data-test="user-create-username"
-          />
-        </el-form-item>
+        <el-table-column label="角色" min-width="180">
+          <template #default="scope">{{ roleNames(scope.row) }}</template>
+        </el-table-column>
 
-        <el-form-item label="初始密码" required>
-          <el-input
-            v-model="createForm.password"
-            type="password"
-            show-password
-            maxlength="32"
-            autocomplete="new-password"
-            data-test="user-create-password"
-          />
-        </el-form-item>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
+              {{ scope.row.status === 1 ? '启用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
 
-        <el-form-item label="邮箱">
-          <el-input
-            v-model="createForm.email"
-            type="email"
-            autocomplete="off"
-            data-test="user-create-email"
-          />
-        </el-form-item>
+        <el-table-column prop="created_at" label="创建时间" min-width="190" />
 
-        <el-form-item label="手机号">
-          <el-input v-model="createForm.phone" autocomplete="off" data-test="user-create-phone" />
-        </el-form-item>
+        <el-table-column label="操作" min-width="220">
+          <template #default="scope">
+            <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
+              编辑
+            </el-button>
+            <el-button
+              v-if="canAssignRoles(scope.row) && canListRoles"
+              text
+              type="primary"
+              @click="openRoles(scope.row)"
+            >
+              角色
+            </el-button>
+            <el-button
+              v-if="canDisable(scope.row) && scope.row.status === 1"
+              text
+              type="danger"
+              @click="onDisable(scope.row)"
+            >
+              停用
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
 
-        <el-form-item v-if="canListRoles" label="角色">
-          <el-select
-            v-model="createForm.roleIds"
-            multiple
-            collapse-tags
-            placeholder="选择角色"
-            data-test="user-create-roles"
-            :loading="rolesQuery.isPending.value"
-            :disabled="canListTenants && createForm.tenantId === ''"
-          >
-            <el-option
-              v-for="roleOption in roles"
-              :key="roleOption.id"
-              :label="roleOption.name"
-              :value="roleOption.id"
-            />
-          </el-select>
-        </el-form-item>
+    <template #empty-action>
+      <el-button v-if="canCreate" type="primary" data-test="user-create" @click="openCreate">
+        新建用户
+      </el-button>
+    </template>
 
-        <div class="user-form-actions">
-          <el-button @click="createVisible = false">取消</el-button>
-          <el-button
-            type="primary"
-            data-test="user-create-submit"
-            :disabled="!canSubmitCreate"
-            :loading="creating"
-            @click="submitCreate"
-          >
-            创建用户
-          </el-button>
-        </div>
-      </el-form>
-    </el-drawer>
-
-    <el-drawer v-model="editVisible" title="编辑用户" size="480px" data-test="user-edit-drawer">
-      <el-alert v-if="editError" type="error" :closable="false" show-icon :title="editError" />
-      <p v-if="editRequestId" class="request-id">请求编号：{{ editRequestId }}</p>
-
-      <el-descriptions v-if="editTarget" :column="1" border class="user-edit-summary">
-        <el-descriptions-item label="用户名">{{ editTarget.username }}</el-descriptions-item>
-        <el-descriptions-item label="所属租户">
-          {{ editTarget.tenant.name }}
-        </el-descriptions-item>
-      </el-descriptions>
-
-      <el-form class="user-form" label-position="top" @submit.prevent="submitEdit">
-        <el-form-item label="状态">
-          <el-select v-model="editForm.status" data-test="user-edit-status">
-            <el-option label="启用" :value="1" />
-            <el-option label="停用" :value="0" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="邮箱">
-          <el-input
-            v-model="editForm.email"
-            type="email"
-            autocomplete="off"
-            data-test="user-edit-email"
-          />
-        </el-form-item>
-
-        <el-form-item label="手机号">
-          <el-input v-model="editForm.phone" autocomplete="off" data-test="user-edit-phone" />
-        </el-form-item>
-
-        <div class="user-form-actions">
-          <el-button @click="editVisible = false">取消</el-button>
-          <el-button
-            type="primary"
-            data-test="user-edit-submit"
-            :loading="updating"
-            @click="submitEdit"
-          >
-            保存更改
-          </el-button>
-        </div>
-      </el-form>
-    </el-drawer>
-
-    <el-dialog v-model="roleVisible" title="分配角色" width="480px" data-test="user-role-dialog">
-      <el-alert v-if="roleError" type="error" :closable="false" show-icon :title="roleError" />
-      <p v-if="roleRequestId" class="request-id">请求编号：{{ roleRequestId }}</p>
-      <p class="role-dialog-description">
-        保存后会替换
-        <strong>{{ roleTarget?.username }}</strong>
-        的全部角色。
-      </p>
-
-      <el-select
-        v-model="roleSelection"
-        multiple
-        collapse-tags
-        placeholder="选择角色"
-        data-test="user-role-select"
-        :loading="rolesQuery.isPending.value"
+    <template #dialogs>
+      <el-drawer
+        v-model="createVisible"
+        title="新建用户"
+        size="480px"
+        data-test="user-create-drawer"
       >
-        <el-option
-          v-for="roleOption in roles"
-          :key="roleOption.id"
-          :label="roleOption.name"
-          :value="roleOption.id"
+        <el-alert
+          v-if="createError"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="createError"
         />
-      </el-select>
+        <p v-if="createRequestId" class="request-id">请求编号：{{ createRequestId }}</p>
 
-      <template #footer>
-        <el-button @click="roleVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          data-test="user-role-submit"
-          :loading="assigningRoles"
-          @click="submitRoles"
+        <el-form class="user-form" label-position="top" @submit.prevent="submitCreate">
+          <el-form-item v-if="canListTenants" label="所属租户" required>
+            <el-select
+              v-model="createForm.tenantId"
+              placeholder="请选择所属租户"
+              data-test="user-create-tenant"
+              :loading="tenantOptionsQuery.isPending.value"
+              @change="onTargetTenantChange"
+            >
+              <el-option
+                v-for="tenantOption in tenants"
+                :key="tenantOption.id"
+                :label="tenantOption.name"
+                :value="tenantOption.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="用户名" required>
+            <el-input
+              v-model="createForm.username"
+              maxlength="64"
+              autocomplete="off"
+              data-test="user-create-username"
+            />
+          </el-form-item>
+
+          <el-form-item label="初始密码" required>
+            <el-input
+              v-model="createForm.password"
+              type="password"
+              show-password
+              maxlength="32"
+              autocomplete="new-password"
+              data-test="user-create-password"
+            />
+          </el-form-item>
+
+          <el-form-item label="邮箱">
+            <el-input
+              v-model="createForm.email"
+              type="email"
+              autocomplete="off"
+              data-test="user-create-email"
+            />
+          </el-form-item>
+
+          <el-form-item label="手机号">
+            <el-input v-model="createForm.phone" autocomplete="off" data-test="user-create-phone" />
+          </el-form-item>
+
+          <el-form-item v-if="canListRoles" label="角色">
+            <el-select
+              v-model="createForm.roleIds"
+              multiple
+              collapse-tags
+              placeholder="选择角色"
+              data-test="user-create-roles"
+              :loading="rolesQuery.isPending.value"
+              :disabled="canListTenants && createForm.tenantId === ''"
+            >
+              <el-option
+                v-for="roleOption in roles"
+                :key="roleOption.id"
+                :label="roleOption.name"
+                :value="roleOption.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <div class="user-form-actions">
+            <el-button @click="createVisible = false">取消</el-button>
+            <el-button
+              type="primary"
+              data-test="user-create-submit"
+              :disabled="!canSubmitCreate"
+              :loading="creating"
+              @click="submitCreate"
+            >
+              创建用户
+            </el-button>
+          </div>
+        </el-form>
+      </el-drawer>
+
+      <el-drawer v-model="editVisible" title="编辑用户" size="480px" data-test="user-edit-drawer">
+        <el-alert v-if="editError" type="error" :closable="false" show-icon :title="editError" />
+        <p v-if="editRequestId" class="request-id">请求编号：{{ editRequestId }}</p>
+
+        <el-descriptions v-if="editTarget" :column="1" border class="user-edit-summary">
+          <el-descriptions-item label="用户名">{{ editTarget.username }}</el-descriptions-item>
+          <el-descriptions-item label="所属租户">
+            {{ editTarget.tenant.name }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <el-form class="user-form" label-position="top" @submit.prevent="submitEdit">
+          <el-form-item label="状态">
+            <el-select v-model="editForm.status" data-test="user-edit-status">
+              <el-option label="启用" :value="1" />
+              <el-option label="停用" :value="0" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="邮箱">
+            <el-input
+              v-model="editForm.email"
+              type="email"
+              autocomplete="off"
+              data-test="user-edit-email"
+            />
+          </el-form-item>
+
+          <el-form-item label="手机号">
+            <el-input v-model="editForm.phone" autocomplete="off" data-test="user-edit-phone" />
+          </el-form-item>
+
+          <div class="user-form-actions">
+            <el-button @click="editVisible = false">取消</el-button>
+            <el-button
+              type="primary"
+              data-test="user-edit-submit"
+              :loading="updating"
+              @click="submitEdit"
+            >
+              保存更改
+            </el-button>
+          </div>
+        </el-form>
+      </el-drawer>
+
+      <el-dialog v-model="roleVisible" title="分配角色" width="480px" data-test="user-role-dialog">
+        <el-alert v-if="roleError" type="error" :closable="false" show-icon :title="roleError" />
+        <p v-if="roleRequestId" class="request-id">请求编号：{{ roleRequestId }}</p>
+        <p class="role-dialog-description">
+          保存后会替换
+          <strong>{{ roleTarget?.username }}</strong>
+          的全部角色。
+        </p>
+
+        <el-select
+          v-model="roleSelection"
+          multiple
+          collapse-tags
+          placeholder="选择角色"
+          data-test="user-role-select"
+          :loading="rolesQuery.isPending.value"
         >
-          保存角色
-        </el-button>
-      </template>
-    </el-dialog>
-  </section>
+          <el-option
+            v-for="roleOption in roles"
+            :key="roleOption.id"
+            :label="roleOption.name"
+            :value="roleOption.id"
+          />
+        </el-select>
+
+        <template #footer>
+          <el-button @click="roleVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            data-test="user-role-submit"
+            :loading="assigningRoles"
+            @click="submitRoles"
+          >
+            保存角色
+          </el-button>
+        </template>
+      </el-dialog>
+    </template>
+  </ManagementPage>
 </template>
 
 <style scoped>
-.users-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.users-heading h1 {
-  font-size: var(--jp-font-size-display);
-  font-weight: var(--jp-font-weight-emphasis);
-  line-height: 1.33;
-}
-
-.users-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
-  padding: 16px;
-  background: var(--jp-color-surface);
-  border: 1px solid var(--jp-color-hairline);
-  border-radius: var(--jp-radius-control);
-}
-
-.users-filters :deep(.el-form-item) {
-  margin: 0;
-}
-
-.users-username-input {
-  width: 220px;
-}
-
-.users-select {
-  width: 150px;
-}
-
-.users-status-select {
-  width: 120px;
-}
-
-.users-state {
-  margin-top: 24px;
-}
-
-.users-retry {
-  margin-top: 12px;
-}
-
-.users-table-scroll {
-  margin-top: 16px;
-  overflow-x: auto;
-  background: var(--jp-color-surface);
-  border: 1px solid var(--jp-color-hairline);
-  border-radius: var(--jp-radius-control);
-}
-
 .users-table {
   min-width: 1050px;
 }
@@ -785,12 +693,8 @@ async function onDisable(row: User): Promise<void> {
   white-space: nowrap;
 }
 
-.users-pagination {
-  margin-top: 16px;
-}
-
 .user-form {
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .user-form :deep(.el-select) {
@@ -823,25 +727,5 @@ async function onDisable(row: User): Promise<void> {
   margin: 12px 0 0;
   color: var(--jp-color-text-muted);
   font-size: var(--jp-font-size-caption);
-}
-
-@media (max-width: 640px) {
-  .users-heading {
-    align-items: flex-start;
-  }
-
-  .users-filters {
-    align-items: stretch;
-  }
-
-  .users-filters :deep(.el-form-item) {
-    width: 100%;
-  }
-
-  .users-username-input,
-  .users-select,
-  .users-status-select {
-    width: 100%;
-  }
 }
 </style>

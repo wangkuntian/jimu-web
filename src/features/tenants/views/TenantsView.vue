@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { Search } from '@lucide/vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import {
@@ -19,6 +20,7 @@ import { ApiError, ErrorCode } from '../../../shared/api/unwrap'
 import type { Plan, Tenant } from '../../../shared/api/types'
 import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
+import ManagementPage from '../../../shared/components/ManagementPage.vue'
 
 const queryClient = useQueryClient()
 
@@ -316,83 +318,76 @@ async function onDelete(row: Tenant): Promise<void> {
 </script>
 
 <template>
-  <section class="tenants-page" aria-labelledby="tenants-title">
-    <p class="eyebrow">Platform</p>
-    <h1 id="tenants-title">租户管理</h1>
-    <p class="page-lead">管理平台下的租户、状态与套餐归属。</p>
-
-    <div v-if="viewState === 'forbidden'" class="tenants-state">
-      <el-result
-        data-test="tenants-forbidden"
-        icon="warning"
-        title="没有访问租户管理的权限"
-        sub-title="请让管理员为你的账号分配 /api/v1/tenants 的 GET 权限"
-      />
-    </div>
-
-    <div
-      v-else-if="viewState === 'identity-error'"
-      class="tenants-state"
-      data-test="tenants-identity-error"
-    >
-      <el-alert
-        type="error"
-        :closable="false"
-        show-icon
-        title="无法确认你的身份"
-        description="后端暂时不可用，读不到当前账号的身份与权限。这不代表权限被移除，请稍后重试。"
-      />
-      <el-button class="tenants-retry" data-test="tenants-identity-retry" @click="retryIdentity">
-        重试
-      </el-button>
-    </div>
-
-    <template v-else>
-      <div class="tenants-filters">
+  <ManagementPage
+    v-model:page="filters.page"
+    title="租户管理"
+    description="管理平台下的租户、状态与套餐归属。"
+    title-id="tenants-title"
+    test-id-prefix="tenants"
+    :state="viewState"
+    forbidden-title="没有访问租户管理的权限"
+    forbidden-description="请让管理员为你的账号分配 /api/v1/tenants 的 GET 权限"
+    :error-message="listErrorMessage"
+    :error-request-id="listErrorRequestId"
+    empty-description="还没有租户，先创建一个开始管理"
+    :total="total"
+    :page-size="filters.pageSize"
+    :loading-rows="4"
+    @retry-identity="retryIdentity"
+    @retry-list="tenantsQuery.refetch()"
+    @filter-submit="applyKeyword"
+  >
+    <template #filters>
+      <el-form-item label="关键词">
         <el-input
           v-model="keywordDraft"
           data-test="tenant-keyword"
-          class="tenants-keyword"
+          class="management-filter-input"
           placeholder="搜索编码或名称"
           clearable
           @keyup.enter="applyKeyword"
-        />
-        <el-button @click="applyKeyword">搜索</el-button>
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+      </el-form-item>
 
+      <el-form-item label="状态">
         <el-select
           v-model="filters.status"
           data-test="tenant-status"
-          class="tenants-select"
-          placeholder="全部"
-          aria-label="状态筛选"
+          class="management-filter-select management-filter-select--narrow"
+          placeholder="全部状态"
           @change="resetPage"
         >
-          <el-option label="全部" value="" />
+          <el-option label="全部状态" value="" />
           <el-option label="启用" :value="1" />
           <el-option label="停用" :value="0" />
         </el-select>
+      </el-form-item>
 
-        <el-select
-          v-model="filters.sort"
-          class="tenants-select"
-          aria-label="排序字段"
-          @change="resetPage"
-        >
+      <el-form-item label="排序">
+        <el-select v-model="filters.sort" class="management-filter-select" @change="resetPage">
           <el-option label="按 ID" value="id" />
           <el-option label="按编码" value="code" />
           <el-option label="按创建时间" value="created_at" />
         </el-select>
+      </el-form-item>
 
+      <el-form-item label="方向">
         <el-select
           v-model="filters.order"
-          class="tenants-select"
-          aria-label="排序方向"
+          class="management-filter-select management-filter-select--narrow"
           @change="resetPage"
         >
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>
+      </el-form-item>
 
+      <el-form-item class="management-filter-actions">
+        <el-button @click="applyKeyword">搜索</el-button>
         <el-button
           v-if="canCreate && viewState === 'table'"
           type="primary"
@@ -401,205 +396,154 @@ async function onDelete(row: Tenant): Promise<void> {
         >
           新建租户
         </el-button>
-      </div>
-
-      <div v-if="viewState === 'loading'" class="tenants-state">
-        <el-skeleton data-test="tenants-loading" :rows="4" animated />
-      </div>
-
-      <div v-else-if="viewState === 'error'" class="tenants-state" data-test="tenants-error">
-        <el-alert type="error" :closable="false" show-icon :title="listErrorMessage" />
-        <p v-if="listErrorRequestId" class="request-id">请求编号：{{ listErrorRequestId }}</p>
-        <el-button class="tenants-retry" @click="tenantsQuery.refetch()">重试</el-button>
-      </div>
-
-      <div v-else-if="viewState === 'empty'" class="tenants-state">
-        <el-empty data-test="tenants-empty" description="还没有租户，先创建一个开始管理">
-          <!-- 空状态的主操作也要按权限渲染：缺 POST 权限时它是注定 403 的动作。 -->
-          <el-button v-if="canCreate" type="primary" data-test="tenant-create" @click="openCreate">
-            新建租户
-          </el-button>
-        </el-empty>
-      </div>
-
-      <template v-else>
-        <div class="tenants-table-scroll" data-test="tenants-table">
-          <el-table class="tenants-table" :data="items" row-key="id">
-            <el-table-column prop="code" label="编码" min-width="140" />
-            <el-table-column prop="name" label="名称" min-width="180" />
-            <el-table-column label="状态" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-                  {{ scope.row.status === 1 ? '启用' : '停用' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="套餐" min-width="140">
-              <template #default="scope">
-                {{ resolvePlanName(scope.row.plan_id, plans) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" min-width="200" />
-            <el-table-column label="操作" min-width="240">
-              <template #default="scope">
-                <el-button
-                  v-if="canUpdate(scope.row)"
-                  text
-                  type="primary"
-                  @click="openEdit(scope.row)"
-                >
-                  编辑
-                </el-button>
-                <el-button
-                  v-if="canDelete(scope.row)"
-                  text
-                  type="danger"
-                  @click="onDelete(scope.row)"
-                >
-                  删除
-                </el-button>
-                <el-button
-                  v-if="canAssignPlan(scope.row)"
-                  text
-                  type="primary"
-                  @click="openPlan(scope.row)"
-                >
-                  分配套餐
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </template>
-
-      <!-- 有总数就渲染分页：空/错误状态也要能翻页离开，不能被假空状态困住。 -->
-      <el-pagination
-        v-if="total > 0"
-        v-model:current-page="filters.page"
-        data-test="tenants-pagination"
-        class="tenants-pagination"
-        :page-size="filters.pageSize"
-        :total="total"
-        layout="prev, pager, next, total"
-        background
-      />
+      </el-form-item>
     </template>
 
-    <el-dialog v-model="createVisible" title="新建租户" width="480px">
-      <el-alert v-if="createError" type="error" :closable="false" show-icon :title="createError" />
-      <p v-if="createRequestId" class="request-id">请求编号：{{ createRequestId }}</p>
+    <template #table>
+      <el-table class="tenants-table" :data="items" row-key="id">
+        <el-table-column prop="code" label="编码" min-width="140" />
+        <el-table-column prop="name" label="名称" min-width="180" />
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
+              {{ scope.row.status === 1 ? '启用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="套餐" min-width="140">
+          <template #default="scope">
+            {{ resolvePlanName(scope.row.plan_id, plans) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" min-width="200" />
+        <el-table-column label="操作" min-width="240">
+          <template #default="scope">
+            <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
+              编辑
+            </el-button>
+            <el-button v-if="canDelete(scope.row)" text type="danger" @click="onDelete(scope.row)">
+              删除
+            </el-button>
+            <el-button
+              v-if="canAssignPlan(scope.row)"
+              text
+              type="primary"
+              @click="openPlan(scope.row)"
+            >
+              分配套餐
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
 
-      <el-form label-position="top">
-        <el-form-item label="租户编码">
-          <el-input v-model="createForm.code" placeholder="仅限字母、数字、短横线和下划线" />
-        </el-form-item>
-        <el-form-item label="租户名称">
-          <el-input v-model="createForm.name" />
-        </el-form-item>
-      </el-form>
+    <template #empty-action>
+      <!-- 空状态的主操作也要按权限渲染：缺 POST 权限时它是注定 403 的动作。 -->
+      <el-button v-if="canCreate" type="primary" data-test="tenant-create" @click="openCreate">
+        新建租户
+      </el-button>
+    </template>
 
-      <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="creating"
-          :disabled="!canSubmitCreate"
-          @click="submitCreate"
-        >
-          创建
-        </el-button>
-      </template>
-    </el-dialog>
+    <template #dialogs>
+      <el-drawer
+        v-model="createVisible"
+        title="新建租户"
+        size="480px"
+        data-test="tenant-create-drawer"
+      >
+        <el-alert
+          v-if="createError"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="createError"
+        />
+        <p v-if="createRequestId" class="request-id">请求编号：{{ createRequestId }}</p>
 
-    <el-dialog v-model="editVisible" title="编辑租户" width="480px">
-      <el-alert v-if="editError" type="error" :closable="false" show-icon :title="editError" />
-      <p v-if="editRequestId" class="request-id">请求编号：{{ editRequestId }}</p>
+        <el-form class="tenant-form" label-position="top">
+          <el-form-item label="租户编码">
+            <el-input v-model="createForm.code" placeholder="仅限字母、数字、短横线和下划线" />
+          </el-form-item>
+          <el-form-item label="租户名称">
+            <el-input v-model="createForm.name" />
+          </el-form-item>
+        </el-form>
 
-      <el-form label-position="top">
-        <el-form-item label="租户名称">
-          <el-input v-model="editForm.name" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="editForm.status" class="tenants-select">
-            <el-option label="启用" :value="1" />
-            <el-option label="停用" :value="0" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+        <template #footer>
+          <el-button @click="createVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="creating"
+            :disabled="!canSubmitCreate"
+            @click="submitCreate"
+          >
+            创建
+          </el-button>
+        </template>
+      </el-drawer>
 
-      <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="updating"
-          :disabled="!canSubmitEdit"
-          @click="submitEdit"
-        >
-          保存
-        </el-button>
-      </template>
-    </el-dialog>
+      <el-drawer v-model="editVisible" title="编辑租户" size="480px" data-test="tenant-edit-drawer">
+        <el-alert v-if="editError" type="error" :closable="false" show-icon :title="editError" />
+        <p v-if="editRequestId" class="request-id">请求编号：{{ editRequestId }}</p>
 
-    <el-dialog v-model="planVisible" title="分配套餐" width="480px">
-      <el-alert v-if="planError" type="error" :closable="false" show-icon :title="planError" />
-      <p v-if="planRequestId" class="request-id">请求编号：{{ planRequestId }}</p>
+        <el-form class="tenant-form" label-position="top">
+          <el-form-item label="租户名称">
+            <el-input v-model="editForm.name" />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="editForm.status">
+              <el-option label="启用" :value="1" />
+              <el-option label="停用" :value="0" />
+            </el-select>
+          </el-form-item>
+        </el-form>
 
-      <el-form label-position="top">
-        <el-form-item :label="`租户 ${planForm.code} 的套餐`">
-          <el-select v-model="planForm.planId" class="tenants-select" aria-label="套餐">
-            <el-option label="取消套餐（不限）" :value="0" />
-            <el-option v-for="plan in plans" :key="plan.id" :label="plan.name" :value="plan.id" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+        <template #footer>
+          <el-button @click="editVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="updating"
+            :disabled="!canSubmitEdit"
+            @click="submitEdit"
+          >
+            保存
+          </el-button>
+        </template>
+      </el-drawer>
 
-      <template #footer>
-        <el-button @click="planVisible = false">取消</el-button>
-        <el-button type="primary" :loading="assigning" @click="submitPlan">保存</el-button>
-      </template>
-    </el-dialog>
-  </section>
+      <el-dialog v-model="planVisible" title="分配套餐" width="480px">
+        <el-alert v-if="planError" type="error" :closable="false" show-icon :title="planError" />
+        <p v-if="planRequestId" class="request-id">请求编号：{{ planRequestId }}</p>
+
+        <el-form class="tenant-form" label-position="top">
+          <el-form-item :label="`租户 ${planForm.code} 的套餐`">
+            <el-select v-model="planForm.planId" aria-label="套餐">
+              <el-option label="取消套餐（不限）" :value="0" />
+              <el-option v-for="plan in plans" :key="plan.id" :label="plan.name" :value="plan.id" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="planVisible = false">取消</el-button>
+          <el-button type="primary" :loading="assigning" @click="submitPlan">保存</el-button>
+        </template>
+      </el-dialog>
+    </template>
+  </ManagementPage>
 </template>
 
 <style scoped>
-.tenants-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.tenants-keyword {
-  width: 240px;
-}
-
-.tenants-select {
-  width: 160px;
-}
-
-.tenants-state {
-  margin-top: 24px;
-}
-
-.tenants-retry {
-  margin-top: 12px;
-}
-
-.tenants-table-scroll {
-  margin-top: 16px;
-  overflow-x: auto;
-  background: var(--jp-color-surface);
-  border: 1px solid var(--jp-color-hairline);
-  border-radius: var(--jp-radius-control);
-}
-
 .tenants-table {
   min-width: 960px;
 }
 
-.tenants-pagination {
+.tenant-form {
   margin-top: 16px;
+}
+
+.tenant-form :deep(.el-select) {
+  width: 100%;
 }
 
 .request-id {
