@@ -17,6 +17,7 @@ const router = createRouter({
       meta: { navLabel: '工作概览' },
     },
     { path: '/admin/users', component: { template: '<div />' } },
+    { path: '/admin/roles', component: { template: '<div />' } },
     { path: '/admin/tenants', component: { template: '<div />' } },
     { path: '/admin/account/security', component: { template: '<div />' } },
     {
@@ -66,6 +67,7 @@ describe('layouts', () => {
       roles: ['超级管理员'],
       permissions: [
         { resource: '/api/v1/users', action: 'GET' },
+        { resource: '/api/v1/roles', action: 'GET' },
         { resource: '/api/v1/tenants', action: 'GET' },
       ],
     })
@@ -85,6 +87,7 @@ describe('layouts', () => {
     expect(wrapper.text()).toContain('Jimu Hub')
     expect(wrapper.text()).toContain('工作概览')
     expect(wrapper.text()).toContain('用户管理')
+    expect(wrapper.text()).toContain('角色管理')
     expect(wrapper.text()).toContain('租户管理')
     expect(wrapper.text()).toContain('账号安全')
     expect(wrapper.text()).toContain('admin')

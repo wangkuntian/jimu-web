@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Building2, House, LayoutGrid, LogOut, PanelLeft, ShieldCheck, Users } from '@lucide/vue'
+import {
+  Building2,
+  House,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  PanelLeft,
+  ShieldCheck,
+  Users,
+} from '@lucide/vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 
 import { LOGIN_ROUTE } from '../app/guards/session'
@@ -37,10 +46,12 @@ const currentPageLabel = computed(() =>
 
 // 导航项按权限隐藏；无权限时入口不出现，但路由本身仍可直达（页面会渲染无权限态）。
 const canViewUsers = computed(() => hasPermission(apiResource('/users'), 'GET'))
+const canViewRoles = computed(() => hasPermission(apiResource('/roles'), 'GET'))
 const canViewTenants = computed(() => hasPermission(apiResource('/tenants'), 'GET'))
 const navigationItems = computed(() => [
   { index: '/admin', label: '工作概览', icon: House },
   ...(canViewUsers.value ? [{ index: '/admin/users', label: '用户管理', icon: Users }] : []),
+  ...(canViewRoles.value ? [{ index: '/admin/roles', label: '角色管理', icon: KeyRound }] : []),
   ...(canViewTenants.value
     ? [{ index: '/admin/tenants', label: '租户管理', icon: Building2 }]
     : []),

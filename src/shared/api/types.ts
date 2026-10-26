@@ -58,6 +58,9 @@ export type RoleRef = Required<Schemas['application.RoleRef']>
 /** 角色；契约 application.RoleResponse。 */
 export type Role = Required<Schemas['application.RoleResponse']>
 
+/** 权限；契约 application.PermissionResponse。 */
+export type Permission = Required<Schemas['application.PermissionResponse']>
+
 /** 用户；契约 application.UserResponse，嵌套引用补齐为业务必填字段。 */
 export type User = Omit<Required<Schemas['application.UserResponse']>, 'roles' | 'tenant'> & {
   roles: RoleRef[]
@@ -67,6 +70,9 @@ export type User = Omit<Required<Schemas['application.UserResponse']>, 'roles' |
 export type CreateUserInput = Schemas['application.CreateUserRequest']
 export type UpdateUserInput = Schemas['application.UpdateUserRequest']
 export type AssignUserRolesInput = Schemas['application.AssignUserRolesRequest']
+export type CreateRoleInput = Schemas['application.CreateRoleRequest']
+export type UpdateRoleInput = Schemas['application.UpdateRoleRequest']
+export type AssignRolePermissionsInput = Schemas['application.AssignPermissionsRequest']
 
 /** 套餐；契约 application.PlanResponse。 */
 export type Plan = Required<Schemas['application.PlanResponse']>

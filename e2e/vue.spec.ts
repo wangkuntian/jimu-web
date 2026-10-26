@@ -27,6 +27,7 @@ test('renders the authorized admin overview', async ({ page }) => {
   await expect(page.getByTestId('portal-permission-count')).toHaveText('12')
   await expect(page.getByTestId('quick-tenants')).toBeVisible()
   await expect(page.getByRole('menuitem', { name: '用户管理', exact: true })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: '角色管理', exact: true })).toBeVisible()
 })
 
 test('exposes a working skip navigation target', async ({ page }) => {

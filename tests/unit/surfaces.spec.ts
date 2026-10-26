@@ -38,7 +38,7 @@ describe('workspace surfaces', () => {
     expect(canAccessAdminSurface()).toBe(false)
   })
 
-  it.each(['/api/v1/users', '/api/v1/tenants'])(
+  it.each(['/api/v1/users', '/api/v1/roles', '/api/v1/tenants'])(
     'grants the admin surface from GET %s',
     (resource) => {
       saveIdentity(identityWith([{ resource, action: 'GET' }]))

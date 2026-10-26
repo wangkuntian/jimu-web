@@ -67,6 +67,12 @@ const router = createRouter({
           meta: { navLabel: '用户管理' },
         },
         {
+          path: 'roles',
+          name: 'admin-roles',
+          component: () => import('../../features/roles/views/RolesView.vue'),
+          meta: { navLabel: '角色管理' },
+        },
+        {
           path: 'tenants',
           name: 'admin-tenants',
           component: () => import('../../features/tenants/views/TenantsView.vue'),

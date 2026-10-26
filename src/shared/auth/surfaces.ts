@@ -12,7 +12,9 @@ export function canAccessWorkspace(): true {
 /** 管理控制台依赖资源读取能力；写入能力不能单独放行整个控制台。 */
 export function canAccessAdminSurface(): boolean {
   return (
-    hasPermission(apiResource('/users'), 'GET') || hasPermission(apiResource('/tenants'), 'GET')
+    hasPermission(apiResource('/users'), 'GET') ||
+    hasPermission(apiResource('/roles'), 'GET') ||
+    hasPermission(apiResource('/tenants'), 'GET')
   )
 }
 

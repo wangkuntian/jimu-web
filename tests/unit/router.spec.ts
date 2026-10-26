@@ -16,6 +16,7 @@ describe('application routes', () => {
     expect(router.resolve('/workspace/account/security').name).toBe('workspace-account-security')
     expect(router.resolve('/admin').name).toBe('admin-home')
     expect(router.resolve('/admin/users').name).toBe('admin-users')
+    expect(router.resolve('/admin/roles').name).toBe('admin-roles')
     expect(router.resolve('/admin/tenants').name).toBe('admin-tenants')
     expect(router.resolve('/admin/account/security').name).toBe('admin-account-security')
   })
