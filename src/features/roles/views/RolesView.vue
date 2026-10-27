@@ -57,7 +57,7 @@ const rolesQuery = useQuery({
 })
 
 const tenantOptionsQuery = useQuery({
-  queryKey: ['role-tenant-options'],
+  queryKey: ['tenants', 'options'],
   queryFn: listTenantOptions,
   enabled: canListTenants,
 })

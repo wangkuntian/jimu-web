@@ -49,14 +49,14 @@ const usersQuery = useQuery({
 })
 
 const tenantOptionsQuery = useQuery({
-  queryKey: ['tenant-options'],
+  queryKey: ['tenants', 'options'],
   queryFn: listTenantOptions,
   enabled: canListTenants,
 })
 
 const roleTenantId = ref<string | undefined>(undefined)
 const rolesQuery = useQuery({
-  queryKey: ['user-role-options', roleTenantId],
+  queryKey: ['roles', 'options', roleTenantId],
   queryFn: () => listRoleOptions(roleTenantId.value),
   enabled: computed(
     () => canListRoleOptions.value && (!canListTenants.value || roleTenantId.value !== undefined),
@@ -156,6 +156,21 @@ function withRequestId(message: string, requestId: string): string {
   return requestId === '' ? message : `${message}（请求编号：${requestId}）`
 }
 
+const tenantOptionsError = computed(() =>
+  tenantOptionsQuery.isError.value ? describeError(tenantOptionsQuery.error.value) : null,
+)
+const roleOptionsError = computed(() =>
+  rolesQuery.isError.value ? describeError(rolesQuery.error.value) : null,
+)
+const tenantOptionsUnavailable = computed(
+  () =>
+    canListTenants.value &&
+    (tenantOptionsQuery.isPending.value || tenantOptionsQuery.isError.value),
+)
+const roleOptionsUnavailable = computed(
+  () => canListRoleOptions.value && (rolesQuery.isPending.value || rolesQuery.isError.value),
+)
+
 function invalidateUsers(): Promise<void> {
   return queryClient.invalidateQueries({ queryKey: ['users'] })
 }
@@ -173,6 +188,8 @@ const createForm = reactive({
 })
 const canSubmitCreate = computed(
   () =>
+    !tenantOptionsUnavailable.value &&
+    !roleOptionsUnavailable.value &&
     (!canListTenants.value || createForm.tenantId !== '') &&
     createForm.username.trim().length >= 3 &&
     createForm.password.length >= 6,
@@ -281,6 +298,9 @@ const roleTarget = ref<User | null>(null)
 const roleSelection = ref<string[]>([])
 const roleError = ref('')
 const roleRequestId = ref('')
+const canSubmitRoles = computed(
+  () => roleTarget.value !== null && !rolesQuery.isPending.value && !rolesQuery.isError.value,
+)
 
 const { isPending: assigningRoles, mutateAsync: assignRolesAsync } = useMutation({
   mutationFn: () => {
@@ -542,6 +562,7 @@ async function onDelete(row: User): Promise<void> {
               placeholder="请选择所属租户"
               data-test="user-create-tenant"
               :loading="tenantOptionsQuery.isPending.value"
+              :disabled="tenantOptionsError !== null"
               @change="onTargetTenantChange"
             >
               <el-option
@@ -552,6 +573,18 @@ async function onDelete(row: User): Promise<void> {
               />
             </el-select>
           </el-form-item>
+          <div v-if="tenantOptionsError" class="option-error" data-test="user-tenant-options-error">
+            <el-alert
+              type="error"
+              :closable="false"
+              show-icon
+              :title="tenantOptionsError.message"
+            />
+            <p v-if="tenantOptionsError.requestId" class="request-id">
+              请求编号：{{ tenantOptionsError.requestId }}
+            </p>
+            <el-button text type="primary" @click="tenantOptionsQuery.refetch()">重试</el-button>
+          </div>
 
           <el-form-item label="用户名" required>
             <el-input
@@ -594,7 +627,9 @@ async function onDelete(row: User): Promise<void> {
               placeholder="选择角色"
               data-test="user-create-roles"
               :loading="rolesQuery.isPending.value"
-              :disabled="canListTenants && createForm.tenantId === ''"
+              :disabled="
+                (canListTenants && createForm.tenantId === '') || roleOptionsError !== null
+              "
             >
               <el-option
                 v-for="roleOption in roles"
@@ -604,6 +639,17 @@ async function onDelete(row: User): Promise<void> {
               />
             </el-select>
           </el-form-item>
+          <div
+            v-if="roleOptionsError"
+            class="option-error"
+            data-test="user-create-role-options-error"
+          >
+            <el-alert type="error" :closable="false" show-icon :title="roleOptionsError.message" />
+            <p v-if="roleOptionsError.requestId" class="request-id">
+              请求编号：{{ roleOptionsError.requestId }}
+            </p>
+            <el-button text type="primary" @click="rolesQuery.refetch()">重试</el-button>
+          </div>
 
           <div class="user-form-actions">
             <el-button @click="createVisible = false">取消</el-button>
@@ -669,6 +715,13 @@ async function onDelete(row: User): Promise<void> {
       <el-dialog v-model="roleVisible" title="分配角色" width="480px" data-test="user-role-dialog">
         <el-alert v-if="roleError" type="error" :closable="false" show-icon :title="roleError" />
         <p v-if="roleRequestId" class="request-id">请求编号：{{ roleRequestId }}</p>
+        <div v-if="roleOptionsError" class="option-error" data-test="user-role-options-error">
+          <el-alert type="error" :closable="false" show-icon :title="roleOptionsError.message" />
+          <p v-if="roleOptionsError.requestId" class="request-id">
+            请求编号：{{ roleOptionsError.requestId }}
+          </p>
+          <el-button text type="primary" @click="rolesQuery.refetch()">重试</el-button>
+        </div>
         <p class="role-dialog-description">
           保存后会替换
           <strong>{{ roleTarget?.username }}</strong>
@@ -682,6 +735,7 @@ async function onDelete(row: User): Promise<void> {
           placeholder="选择角色"
           data-test="user-role-select"
           :loading="rolesQuery.isPending.value"
+          :disabled="roleOptionsError !== null"
         >
           <el-option
             v-for="roleOption in roles"
@@ -696,6 +750,7 @@ async function onDelete(row: User): Promise<void> {
           <el-button
             type="primary"
             data-test="user-role-submit"
+            :disabled="!canSubmitRoles"
             :loading="assigningRoles"
             @click="submitRoles"
           >
@@ -742,6 +797,13 @@ async function onDelete(row: User): Promise<void> {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 24px;
+}
+
+.option-error {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: -4px 0 16px;
 }
 
 .user-edit-summary {

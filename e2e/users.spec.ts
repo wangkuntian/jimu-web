@@ -183,6 +183,26 @@ test('creates a platform user inside the selected tenant', async ({ page }) => {
   })
 })
 
+test('shows role option failures and disables role assignment', async ({ page }) => {
+  await setupUserRoutes(page)
+  await page.route(/\/api\/v1\/roles\/options(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 1005, message: '角色选项加载失败' }),
+    }),
+  )
+  await seedSession(page)
+  await page.goto('/admin/users')
+  await expect(page.getByTestId('users-table')).toContainText('alice')
+
+  await page.getByRole('button', { name: '角色', exact: true }).click()
+  const roleDialog = page.locator('.el-dialog').filter({ hasText: '分配角色' })
+  await expect(page.getByTestId('user-role-options-error')).toBeVisible()
+  await expect(page.getByTestId('user-role-options-error')).toContainText('角色选项加载失败')
+  await expect(roleDialog.getByRole('button', { name: '保存角色' })).toBeDisabled()
+})
+
 test('edits, reassigns roles, stops, and deletes a user', async ({ page }) => {
   const payloads = await setupUserRoutes(page)
   await seedSession(page)

@@ -3,7 +3,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus from 'element-plus'
 import { ElMessageBox } from 'element-plus'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import UsersView from '../../src/features/users/views/UsersView.vue'
@@ -17,7 +17,7 @@ import {
   updateUser,
   assignUserRoles,
 } from '../../src/features/users/api'
-import type { Identity, User } from '../../src/shared/api/types'
+import type { Identity, RoleOption, User } from '../../src/shared/api/types'
 import { ApiError, ErrorCode } from '../../src/shared/api/unwrap'
 import { clearIdentity, saveIdentity, setIdentityStatus } from '../../src/shared/auth/session'
 
@@ -46,6 +46,7 @@ const createUserMock = vi.mocked(createUser)
 const updateUserMock = vi.mocked(updateUser)
 const deleteUserMock = vi.mocked(deleteUser)
 const assignUserRolesMock = vi.mocked(assignUserRoles)
+const mountedWrappers: Array<{ unmount: () => void }> = []
 
 const user: User = {
   id: '370528943163310080',
@@ -122,7 +123,9 @@ function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number)
   pagination.vm.$emit('current-change', page)
 }
 
-function mountView() {
+function mountView(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -131,16 +134,9 @@ function mountView() {
     ],
   })
 
-  return mount(UsersView, {
+  const wrapper = mount(UsersView, {
     global: {
-      plugins: [
-        ElementPlus,
-        router,
-        [
-          VueQueryPlugin,
-          { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-        ],
-      ],
+      plugins: [ElementPlus, router, [VueQueryPlugin, { queryClient }]],
       stubs: {
         teleport: true,
         ElDrawer: {
@@ -164,6 +160,8 @@ function mountView() {
       },
     },
   })
+  mountedWrappers.push(wrapper)
+  return wrapper
 }
 
 describe('UsersView', () => {
@@ -178,6 +176,10 @@ describe('UsersView', () => {
     updateUserMock.mockResolvedValue()
     deleteUserMock.mockResolvedValue()
     assignUserRolesMock.mockResolvedValue()
+  })
+
+  afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
   })
 
   it('renders the no-permission state without requesting users', async () => {
@@ -368,6 +370,7 @@ describe('UsersView', () => {
 
     tenantSelect.vm.$emit('update:modelValue', 'tenant-2')
     tenantSelect.vm.$emit('change', 'tenant-2')
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenLastCalledWith('tenant-2'))
     await wrapper.find('[data-test="user-create-submit"]').trigger('click')
 
     await vi.waitFor(() =>
@@ -455,6 +458,136 @@ describe('UsersView', () => {
     await vi.waitFor(() =>
       expect(assignUserRolesMock).toHaveBeenCalledWith(user.id, [secondRole.id]),
     )
+  })
+
+  it('renders platform roles returned for a default-tenant user', async () => {
+    const platformUser = { ...user, tenant: { id: '1', name: '默认租户' } }
+    const platformRole: RoleOption = {
+      id: 'platform-role',
+      name: '平台审计员',
+      code: 'platform_auditor',
+      scope: 'platform',
+      is_system: true,
+    }
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [platformUser], total: 1, page: 1, pageSize: 20 })
+    listRoleOptionsMock.mockResolvedValue([platformRole])
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '角色')
+      ?.trigger('click')
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith('1'))
+
+    expect(wrapper.text()).toContain('平台审计员（系统）')
+    expect(wrapper.find('[data-test="user-role-submit"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('reuses the shared tenant and role query keys for cross-page invalidation', async () => {
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const wrapper = mountView(queryClient)
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await vi.waitFor(() => expect(listTenantOptionsMock).toHaveBeenCalledTimes(1))
+
+    await queryClient.invalidateQueries({ queryKey: ['tenants'] })
+    await vi.waitFor(() => expect(listTenantOptionsMock).toHaveBeenCalledTimes(2))
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '角色')
+      ?.trigger('click')
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledTimes(1))
+
+    await queryClient.invalidateQueries({ queryKey: ['roles'] })
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows a retryable error when tenant options fail', async () => {
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    listTenantOptionsMock
+      .mockRejectedValueOnce(
+        new ApiError(ErrorCode.internal, '租户选项加载失败', 'req-tenant-options'),
+      )
+      .mockResolvedValueOnce([tenant])
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await wrapper.find('[data-test="user-create"]').trigger('click')
+    const error = await vi.waitFor(() => {
+      const node = wrapper.find('[data-test="user-tenant-options-error"]')
+      expect(node.exists()).toBe(true)
+      return node
+    })
+    expect(error.text()).toContain('租户选项加载失败')
+    expect(error.text()).toContain('req-tenant-options')
+
+    await error.find('button').trigger('click')
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="user-tenant-options-error"]').exists()).toBe(false),
+    )
+    expect(listTenantOptionsMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('disables create until failed role options are retried', async () => {
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    listRoleOptionsMock
+      .mockRejectedValueOnce(
+        new ApiError(ErrorCode.internal, '角色选项加载失败', 'req-role-options'),
+      )
+      .mockResolvedValueOnce([role])
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await wrapper.find('[data-test="user-create"]').trigger('click')
+    await wrapper.find('input[data-test="user-create-username"]').setValue('bob')
+    await wrapper.find('input[data-test="user-create-password"]').setValue('secret123')
+    const tenantSelect = wrapper.findComponent('[data-test="user-create-tenant"]') as VueWrapper
+    tenantSelect.vm.$emit('update:modelValue', tenant.id)
+    tenantSelect.vm.$emit('change', tenant.id)
+
+    const error = await vi.waitFor(() => {
+      const node = wrapper.find('[data-test="user-create-role-options-error"]')
+      expect(node.exists()).toBe(true)
+      return node
+    })
+    expect(error.text()).toContain('角色选项加载失败')
+    expect(wrapper.find('[data-test="user-create-submit"]').attributes('disabled')).toBeDefined()
+
+    await error.find('button').trigger('click')
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="user-create-role-options-error"]').exists()).toBe(false),
+    )
+    expect(wrapper.find('[data-test="user-create-submit"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('disables role assignment when role options fail', async () => {
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    listRoleOptionsMock.mockRejectedValue(
+      new ApiError(ErrorCode.internal, '角色选项加载失败', 'req-role-dialog'),
+    )
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '角色')
+      ?.trigger('click')
+
+    const error = await vi.waitFor(() => {
+      const node = wrapper.find('[data-test="user-role-options-error"]')
+      expect(node.exists()).toBe(true)
+      return node
+    })
+    expect(error.text()).toContain('角色选项加载失败')
+    expect(wrapper.find('[data-test="user-role-submit"]').attributes('disabled')).toBeDefined()
   })
 
   it('stops a user with PUT and permanently deletes with DELETE', async () => {
