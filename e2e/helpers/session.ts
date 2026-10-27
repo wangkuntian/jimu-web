@@ -8,7 +8,7 @@ export interface E2eIdentity {
 
 export const ADMIN_IDENTITY: E2eIdentity = {
   user: { id: 1, username: 'admin', status: 1, tenant_id: 1, created_at: '2026-10-19T00:00:00Z' },
-  roles: ['超级管理员'],
+  roles: ['平台超级管理员'],
   permissions: [
     { resource: '/api/v1/users', action: 'GET' },
     { resource: '/api/v1/users', action: 'POST' },
@@ -16,6 +16,7 @@ export const ADMIN_IDENTITY: E2eIdentity = {
     { resource: '/api/v1/users/*', action: 'DELETE' },
     { resource: '/api/v1/users/*/roles', action: 'POST' },
     { resource: '/api/v1/roles', action: 'GET' },
+    { resource: '/api/v1/roles/options', action: 'GET' },
     { resource: '/api/v1/tenants', action: 'GET' },
     { resource: '/api/v1/tenants', action: 'POST' },
     { resource: '/api/v1/tenants/*', action: 'GET' },
@@ -29,7 +30,7 @@ export const ADMIN_IDENTITY: E2eIdentity = {
 export const USER_MANAGER_IDENTITY: E2eIdentity = {
   ...ADMIN_IDENTITY,
   permissions: ADMIN_IDENTITY.permissions.filter(
-    (permission) => !permission.resource.startsWith('/api/v1/tenants'),
+    (permission) => !permission.resource.startsWith('/api/v1/tenant'),
   ),
 }
 

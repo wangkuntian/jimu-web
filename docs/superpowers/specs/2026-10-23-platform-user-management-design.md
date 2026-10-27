@@ -14,7 +14,7 @@
 - `/hub` 是多工作台选择页；`/portal` 重定向到 `/hub`。
 - `/workspace/*` 是用户工作区，使用独立 `UserLayout`。
 - `/admin/*` 是管理控制台，继续使用 `PortalLayout`。
-- `/admin/users` 提供平台用户列表、筛选、创建、编辑、角色分配和停用。
+- `/admin/users` 提供平台用户列表、筛选、创建、编辑、角色分配、停用和删除。
 - 平台管理员创建用户时必须选择所属租户；角色只从目标租户加载。
 - 共享登录、会话、权限判定、API client 和基础组件，不建立第二套认证。
 
@@ -27,7 +27,7 @@
 ## 工作台分流
 
 - 用户工作区对所有已登录用户可用。
-- 管理控制台仅在具备用户管理或租户管理读取能力时显示。
+- 管理控制台在具备用户、角色或租户管理读取能力时显示。
 - 只有一个可用工作台时直接进入。
 - 存在两个工作台时，首次进入 `/hub`；之后恢复最近使用的可用工作台，并允许通过账户菜单切换。
 - 明确访问 `/admin/*` 或 `/workspace/*` 的登录回跳优先于默认 `/hub`。
@@ -41,22 +41,22 @@ GET    /api/v1/users/{id}
 PUT    /api/v1/users/{id}
 DELETE /api/v1/users/{id}
 POST   /api/v1/users/{id}/roles
-GET    /api/v1/roles?tenant_id={tenantId}
+GET    /api/v1/roles/options?tenant_id={tenantId}
 ```
 
 - 列表筛选：`username`、`status`、`tenant_id`、`page`、`page_size`、`sort`、`order`。
 - 创建请求：`tenant_id`、`username`、`password`、`email`、`phone`、`role_ids`。
 - 更新请求：`status`、`email`、`phone`。
-- 删除接口语义是停用，页面按钮使用“停用”。
-- 角色分配使用 `role_ids` 替换用户全部角色。
+- 停用使用 `PUT /users/{id}` + `status=0`；删除使用 `DELETE /users/{id}` 软删除，最后一个有效平台超管删除返回 `409`。
+- 角色分配使用 `role_ids` 替换用户全部角色；可分配角色只读取目标租户的启用角色选项。
 - 用户、租户和角色 ID 在前端统一按字符串处理。
 
 ## 页面设计
 
-- `/admin/users` 使用筛选栏、分页表格、创建抽屉、编辑抽屉、角色分配对话框和停用确认。
+- `/admin/users` 使用筛选栏、分页表格、创建抽屉、编辑抽屉、角色分配对话框，以及独立的停用/删除确认。
 - 表格列：用户名、所属租户、角色、状态、创建时间、操作。
 - 创建抽屉先选择租户，再加载该租户角色；切换租户时清空已选角色。
-- 状态使用启用/停用标签；停用保留数据，可通过编辑重新启用。
+- 状态使用启用/停用标签；停用保留数据，可通过编辑重新启用；删除后账号从常规列表消失。
 - 加载、空、错误、无权限和身份不可用状态沿用租户管理页的互斥判定方式。
 
 ## 权限
@@ -64,9 +64,10 @@ GET    /api/v1/roles?tenant_id={tenantId}
 - 页面读取：`GET /api/v1/users`
 - 创建：`POST /api/v1/users`
 - 编辑：`PUT /api/v1/users/*`
-- 停用：`DELETE /api/v1/users/*`
+- 停用：`PUT /api/v1/users/*`
+- 删除：`DELETE /api/v1/users/*`
 - 角色分配：`POST /api/v1/users/*/roles`
-- 角色列表：`GET /api/v1/roles`
+- 角色选项：`GET /api/v1/roles/options`
 - 租户选项：`GET /api/v1/tenants`
 
 ## 兼容与迁移
@@ -80,5 +81,5 @@ GET    /api/v1/roles?tenant_id={tenantId}
 ## 验证
 
 - 单元测试覆盖工作台分流、用户查询参数、请求载荷、权限和 ID 迁移。
-- Playwright 覆盖 `/hub`、旧路由重定向、管理员/普通用户分流、用户列表、筛选、创建、编辑、角色分配和停用。
+- Playwright 覆盖 `/hub`、旧路由重定向、管理员/普通用户分流、用户列表、筛选、创建、编辑、角色分配、停用和删除。
 - `pnpm run check` 与 `pnpm run test:e2e` 必须通过。

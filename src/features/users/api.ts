@@ -1,5 +1,11 @@
 import { api } from '../../shared/api/client'
-import type { CreateUserInput, Role, Tenant, UpdateUserInput, User } from '../../shared/api/types'
+import type {
+  CreateUserInput,
+  RoleOption,
+  Tenant,
+  UpdateUserInput,
+  User,
+} from '../../shared/api/types'
 import { resolveEnvelope, unwrap, unwrapEnvelope, unwrapOk } from '../../shared/api/unwrap'
 import type { UserListQuery } from './params'
 
@@ -62,8 +68,8 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<vo
   unwrapOk(resolveEnvelope({ data, error, response }))
 }
 
-/** DELETE 在这里表示停用；后端成功返回 204，没有信封可解。 */
-export async function disableUser(id: string): Promise<void> {
+/** 删除用户；后端成功返回 204，没有信封可解。 */
+export async function deleteUser(id: string): Promise<void> {
   const { data, error, response } = await api.DELETE('/users/{id}', {
     params: { path: { id } },
   })
@@ -83,26 +89,13 @@ export async function assignUserRoles(id: string, roleIds: string[]): Promise<vo
 }
 
 /** tenantId 为空时由后端按当前登录身份解析租户。 */
-export async function listRoles(tenantId?: string): Promise<Role[]> {
-  return loadAllOptionPages(async (page) => {
-    const { data, error, response } = await api.GET('/roles', {
-      params: {
-        query: {
-          page,
-          page_size: OPTION_PAGE_SIZE,
-          sort: 'id',
-          order: 'asc',
-          ...(tenantId === undefined ? {} : { tenant_id: tenantId }),
-        },
-      },
-    })
-    const envelope = unwrapEnvelope(resolveEnvelope({ data, error, response }))
-
-    return {
-      items: unwrap<Role[]>(envelope),
-      total: envelope.total ?? 0,
-    }
+export async function listRoleOptions(tenantId?: string): Promise<RoleOption[]> {
+  const { data, error, response } = await api.GET('/roles/options', {
+    params: {
+      query: tenantId === undefined ? {} : { tenant_id: tenantId },
+    },
   })
+  return unwrap<RoleOption[]>(resolveEnvelope({ data, error, response }))
 }
 
 export async function listTenantOptions(): Promise<Tenant[]> {

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-import { seedSession, ZERO_ROLE_IDENTITY } from './helpers/session'
+import { ADMIN_IDENTITY, seedSession, ZERO_ROLE_IDENTITY } from './helpers/session'
 
 test('renders the authorized admin overview', async ({ page }) => {
   await seedSession(page)
@@ -23,8 +23,10 @@ test('renders the authorized admin overview', async ({ page }) => {
   await expect(page.locator('.quick-panel')).toHaveCSS('animation-name', 'none')
   await expect(page.getByRole('heading', { name: '工作概览' })).toBeVisible()
   await expect(page.getByText('欢迎回来，admin')).toBeVisible()
-  await expect(page.getByTestId('portal-role')).toHaveText('超级管理员')
-  await expect(page.getByTestId('portal-permission-count')).toHaveText('12')
+  await expect(page.getByTestId('portal-role')).toHaveText('平台超级管理员')
+  await expect(page.getByTestId('portal-permission-count')).toHaveText(
+    String(ADMIN_IDENTITY.permissions.length),
+  )
   await expect(page.getByTestId('quick-tenants')).toBeVisible()
   await expect(page.getByRole('menuitem', { name: '用户管理', exact: true })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: '角色管理', exact: true })).toBeVisible()

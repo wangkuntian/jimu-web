@@ -9,7 +9,7 @@ import RolesView from '../../src/features/roles/views/RolesView.vue'
 import {
   assignRolePermissions,
   createRole,
-  disableRole,
+  deleteRole,
   getRolePermissions,
   listPermissions,
   listRoles,
@@ -32,7 +32,7 @@ vi.mock('../../src/features/roles/api', () => ({
   listRoles: vi.fn(),
   createRole: vi.fn(),
   updateRole: vi.fn(),
-  disableRole: vi.fn(),
+  deleteRole: vi.fn(),
   listPermissions: vi.fn(),
   getRolePermissions: vi.fn(),
   assignRolePermissions: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock('../../src/features/roles/api', () => ({
 const listRolesMock = vi.mocked(listRoles)
 const createRoleMock = vi.mocked(createRole)
 const updateRoleMock = vi.mocked(updateRole)
-const disableRoleMock = vi.mocked(disableRole)
+const deleteRoleMock = vi.mocked(deleteRole)
 const listPermissionsMock = vi.mocked(listPermissions)
 const getRolePermissionsMock = vi.mocked(getRolePermissions)
 const assignRolePermissionsMock = vi.mocked(assignRolePermissions)
@@ -63,9 +63,22 @@ const role: Role = {
   tenant_id: tenant.id,
   name: '运营管理员',
   description: '负责租户运营',
+  code: '',
+  scope: 'tenant',
+  is_system: false,
   status: 1,
   created_at: '2026-10-19T00:00:00Z',
   updated_at: '2026-10-19T00:00:00Z',
+}
+
+const systemRole: Role = {
+  ...role,
+  id: '370528943163310090',
+  name: '平台超级管理员',
+  description: '平台最高权限',
+  code: 'platform_super_admin',
+  scope: 'platform',
+  is_system: true,
 }
 
 const userListPermission: Permission = {
@@ -161,7 +174,7 @@ function mountView() {
           template: '<div class="el-option-stub">{{ label }}</div>',
         },
         ElCheckbox: {
-          props: ['modelValue', 'value', 'indeterminate'],
+          props: ['modelValue', 'value', 'indeterminate', 'disabled'],
           emits: ['update:modelValue', 'change'],
           template: '<label class="el-checkbox-stub"><slot /></label>',
         },
@@ -179,7 +192,7 @@ describe('RolesView', () => {
     listRolesMock.mockResolvedValue({ items: [role], total: 1, page: 1, pageSize: 20 })
     createRoleMock.mockResolvedValue(role)
     updateRoleMock.mockResolvedValue()
-    disableRoleMock.mockResolvedValue()
+    deleteRoleMock.mockResolvedValue()
     listPermissionsMock.mockResolvedValue([userListPermission, userCreatePermission])
     getRolePermissionsMock.mockResolvedValue([userListPermission])
     assignRolePermissionsMock.mockResolvedValue()
@@ -262,7 +275,7 @@ describe('RolesView', () => {
     )
   })
 
-  it('edits the role and disables it after confirmation', async () => {
+  it('edits, stops, and permanently deletes a custom role', async () => {
     saveIdentity(roleAdminIdentity)
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
     const wrapper = mountView()
@@ -292,7 +305,23 @@ describe('RolesView', () => {
         expect.anything(),
       ),
     )
-    await vi.waitFor(() => expect(disableRoleMock).toHaveBeenCalledWith(role.id))
+    await vi.waitFor(() =>
+      expect(updateRoleMock).toHaveBeenLastCalledWith(role.id, {
+        name: role.name,
+        description: role.description,
+        status: 0,
+      }),
+    )
+
+    buttonByText(wrapper, '删除')?.trigger('click')
+    await vi.waitFor(() =>
+      expect(confirm).toHaveBeenLastCalledWith(
+        expect.stringContaining('删除后无法恢复'),
+        '删除角色',
+        expect.anything(),
+      ),
+    )
+    await vi.waitFor(() => expect(deleteRoleMock).toHaveBeenCalledWith(role.id))
   })
 
   it('loads current permissions and saves the complete selection', async () => {
@@ -324,6 +353,35 @@ describe('RolesView', () => {
         userCreatePermission.id,
       ]),
     )
+  })
+
+  it('shows system role metadata and only allows read-only permission inspection', async () => {
+    saveIdentity(roleAdminIdentity)
+    listRolesMock.mockResolvedValue({ items: [systemRole], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
+    expect(wrapper.text()).toContain('平台超级管理员')
+    expect(wrapper.text()).toContain('platform_super_admin')
+    expect(wrapper.text()).toContain('系统')
+    expect(wrapper.text()).toContain('平台')
+    expect(buttonByText(wrapper, '编辑')).toBeUndefined()
+    expect(buttonByText(wrapper, '停用')).toBeUndefined()
+    expect(buttonByText(wrapper, '删除')).toBeUndefined()
+
+    await buttonByText(wrapper, '查看权限')?.trigger('click')
+    await vi.waitFor(() => expect(getRolePermissionsMock).toHaveBeenCalledWith(systemRole.id))
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="role-permission-list"]').exists()).toBe(true),
+    )
+
+    expect(wrapper.text()).toContain('系统角色的权限由后端维护，不可在此修改')
+    expect(wrapper.find('[data-test="role-permission-submit"]').exists()).toBe(false)
+    const checkbox = wrapper.findComponent(
+      `[data-test="role-permission-${userListPermission.id}"]`,
+    ) as VueWrapper
+    expect(checkbox.props()).toMatchObject({ modelValue: true, disabled: true })
+    expect(assignRolePermissionsMock).not.toHaveBeenCalled()
   })
 
   it('hides row actions without their own permission points', async () => {

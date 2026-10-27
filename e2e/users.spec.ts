@@ -28,33 +28,29 @@ const user = {
 const roles = [
   {
     id: 'role-developer',
-    tenant_id: tenant.id,
     name: 'developer',
-    description: '',
-    status: 1,
-    created_at: '',
-    updated_at: '',
+    code: '',
+    scope: 'tenant',
+    is_system: false,
   },
   {
     id: 'role-reviewer',
-    tenant_id: tenant.id,
     name: 'reviewer',
-    description: '',
-    status: 1,
-    created_at: '',
-    updated_at: '',
+    code: '',
+    scope: 'tenant',
+    is_system: false,
   },
 ]
 
 interface CapturedPayloads {
   create?: unknown
-  update?: unknown
+  updates: unknown[]
   roles?: unknown
-  disabled: string[]
+  deleted: string[]
 }
 
 async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
-  const payloads: CapturedPayloads = { disabled: [] }
+  const payloads: CapturedPayloads = { updates: [], deleted: [] }
 
   await page.route('**/api/v1/users**', async (route) => {
     const request = route.request()
@@ -97,7 +93,7 @@ async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
     }
 
     if (request.method() === 'PUT') {
-      payloads.update = await request.postDataJSON()
+      payloads.updates.push(await request.postDataJSON())
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -107,7 +103,7 @@ async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
     }
 
     if (request.method() === 'DELETE') {
-      payloads.disabled.push(pathname.split('/').at(-1) ?? '')
+      payloads.deleted.push(pathname.split('/').at(-1) ?? '')
       await route.fulfill({ status: 204 })
       return
     }
@@ -134,7 +130,7 @@ async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
     }),
   )
 
-  await page.route(/\/api\/v1\/roles(\?.*)?$/, (route) =>
+  await page.route(/\/api\/v1\/roles\/options(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -142,9 +138,6 @@ async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
         code: 0,
         message: 'ok',
         data: roles,
-        total: roles.length,
-        page: 1,
-        page_size: 100,
       }),
     }),
   )
@@ -190,7 +183,7 @@ test('creates a platform user inside the selected tenant', async ({ page }) => {
   })
 })
 
-test('edits, reassigns roles, and deactivates a user', async ({ page }) => {
+test('edits, reassigns roles, stops, and deletes a user', async ({ page }) => {
   const payloads = await setupUserRoutes(page)
   await seedSession(page)
   await page.goto('/admin/users')
@@ -208,7 +201,7 @@ test('edits, reassigns roles, and deactivates a user', async ({ page }) => {
   await page.getByRole('option', { name: '停用', exact: true }).click()
   await editDrawer.getByRole('button', { name: '保存更改' }).click()
   await expect(page.getByText('用户已更新')).toBeVisible()
-  expect(payloads.update).toEqual({
+  expect(payloads.updates[0]).toEqual({
     status: 0,
     email: 'updated@example.com',
     phone: '13900000000',
@@ -226,5 +219,10 @@ test('edits, reassigns roles, and deactivates a user', async ({ page }) => {
   await page.getByRole('button', { name: '停用', exact: true }).click()
   await page.locator('.el-message-box').getByRole('button', { name: '停用' }).click()
   await expect(page.getByText('用户已停用')).toBeVisible()
-  expect(payloads.disabled).toEqual([user.id])
+  expect(payloads.updates[1]).toEqual({ status: 0 })
+
+  await page.getByRole('button', { name: '删除', exact: true }).click()
+  await page.locator('.el-message-box').getByRole('button', { name: '删除' }).click()
+  await expect(page.getByText('用户已删除')).toBeVisible()
+  expect(payloads.deleted).toEqual([user.id])
 })

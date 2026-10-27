@@ -7,7 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   assignRolePermissions,
   createRole,
-  disableRole,
+  deleteRole,
   getRolePermissions,
   listPermissions,
   listRoles,
@@ -129,17 +129,23 @@ function tenantName(tenantId: string): string {
 }
 
 function canUpdate(row: Role): boolean {
-  return hasPermission(apiResource(`/roles/${row.id}`), 'PUT')
+  return !row.is_system && hasPermission(apiResource(`/roles/${row.id}`), 'PUT')
 }
 
-function canDisable(row: Role): boolean {
-  return hasPermission(apiResource(`/roles/${row.id}`), 'DELETE')
+function canDelete(row: Role): boolean {
+  return !row.is_system && hasPermission(apiResource(`/roles/${row.id}`), 'DELETE')
 }
 
-function canManagePermissions(row: Role): boolean {
+function canViewPermissions(row: Role): boolean {
   return (
-    canListPermissions.value &&
-    hasPermission(apiResource(`/roles/${row.id}/permissions`), 'GET') &&
+    canListPermissions.value && hasPermission(apiResource(`/roles/${row.id}/permissions`), 'GET')
+  )
+}
+
+function canSavePermissions(row: Role): boolean {
+  return (
+    !row.is_system &&
+    canViewPermissions(row) &&
     hasPermission(apiResource(`/roles/${row.id}/permissions`), 'POST')
   )
 }
@@ -259,12 +265,17 @@ async function submitEdit(): Promise<void> {
   }
 }
 
-const { mutateAsync: disableRoleAsync } = useMutation({
-  mutationFn: (id: string) => disableRole(id),
+const { mutateAsync: stopRoleAsync } = useMutation({
+  mutationFn: (row: Role) =>
+    updateRole(row.id, {
+      name: row.name,
+      description: row.description,
+      status: 0,
+    }),
   onSuccess: invalidateRoles,
 })
 
-async function onDisable(row: Role): Promise<void> {
+async function onStop(row: Role): Promise<void> {
   try {
     await ElMessageBox.confirm(
       '停用后该角色不再授予权限，角色数据仍会保留，可通过编辑重新启用。确认停用？',
@@ -280,8 +291,37 @@ async function onDisable(row: Role): Promise<void> {
   }
 
   try {
-    await disableRoleAsync(row.id)
+    await stopRoleAsync(row)
     ElMessage.success('角色已停用')
+  } catch (error) {
+    const info = describeError(error)
+    ElMessage.error(withRequestId(info.message, info.requestId))
+  }
+}
+
+const { mutateAsync: deleteRoleAsync } = useMutation({
+  mutationFn: (id: string) => deleteRole(id),
+  onSuccess: invalidateRoles,
+})
+
+async function onDelete(row: Role): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '删除后无法恢复；已分配给用户的角色不能删除。确认删除该角色？',
+      '删除角色',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await deleteRoleAsync(row.id)
+    ElMessage.success('角色已删除')
   } catch (error) {
     const info = describeError(error)
     ElMessage.error(withRequestId(info.message, info.requestId))
@@ -294,6 +334,19 @@ const permissionSelection = ref<string[]>([])
 const permissionKeyword = ref('')
 const permissionError = ref('')
 const permissionRequestId = ref('')
+const permissionReadonly = computed(
+  () => permissionTarget.value === null || !canSavePermissions(permissionTarget.value),
+)
+const permissionDrawerTitle = computed(() => (permissionReadonly.value ? '查看权限' : '分配权限'))
+const permissionCopy = computed(() => {
+  if (permissionTarget.value?.is_system === true) {
+    return '系统角色的权限由后端维护，不可在此修改。'
+  }
+  if (permissionReadonly.value) {
+    return '当前账号只有权限查看能力，不能修改此角色的权限。'
+  }
+  return '保存后会整体替换该角色的权限；清空全部勾选即移除全部权限。'
+})
 
 const currentPermissionsQuery = useQuery({
   queryKey: computed(() => ['role-permissions', permissionTarget.value?.id ?? '']),
@@ -524,7 +577,11 @@ async function submitPermissions(): Promise<void> {
         <el-table-column label="角色" min-width="260">
           <template #default="scope">
             <div class="role-identity">
-              <strong>{{ scope.row.name }}</strong>
+              <div class="role-identity-title">
+                <strong>{{ scope.row.name }}</strong>
+                <el-tag v-if="scope.row.is_system" size="small" effect="plain">系统</el-tag>
+                <code v-if="scope.row.code" class="role-code">{{ scope.row.code }}</code>
+              </div>
               <span>{{ scope.row.description || '未填写说明' }}</span>
             </div>
           </template>
@@ -532,6 +589,14 @@ async function submitPermissions(): Promise<void> {
 
         <el-table-column label="所属租户" min-width="180">
           <template #default="scope">{{ tenantName(scope.row.tenant_id) }}</template>
+        </el-table-column>
+
+        <el-table-column label="范围" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.scope === 'platform' ? 'warning' : 'info'" effect="plain">
+              {{ scope.row.scope === 'platform' ? '平台' : '租户' }}
+            </el-tag>
+          </template>
         </el-table-column>
 
         <el-table-column label="状态" width="100">
@@ -544,26 +609,29 @@ async function submitPermissions(): Promise<void> {
 
         <el-table-column prop="created_at" label="创建时间" min-width="190" />
 
-        <el-table-column label="操作" min-width="220">
+        <el-table-column label="操作" min-width="280">
           <template #default="scope">
             <el-button
-              v-if="canManagePermissions(scope.row)"
+              v-if="canViewPermissions(scope.row)"
               text
               type="primary"
               @click="openPermissions(scope.row)"
             >
-              权限
+              {{ canSavePermissions(scope.row) ? '权限' : '查看权限' }}
             </el-button>
             <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
               编辑
             </el-button>
             <el-button
-              v-if="canDisable(scope.row) && scope.row.status === 1"
+              v-if="canUpdate(scope.row) && scope.row.status === 1"
               text
               type="danger"
-              @click="onDisable(scope.row)"
+              @click="onStop(scope.row)"
             >
               停用
+            </el-button>
+            <el-button v-if="canDelete(scope.row)" text type="danger" @click="onDelete(scope.row)">
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -689,7 +757,7 @@ async function submitPermissions(): Promise<void> {
 
       <el-drawer
         v-model="permissionVisible"
-        title="分配权限"
+        :title="permissionDrawerTitle"
         size="min(560px, 100%)"
         data-test="role-permission-drawer"
       >
@@ -705,9 +773,7 @@ async function submitPermissions(): Promise<void> {
         <div class="permission-summary">
           <div>
             <p class="permission-role-name">{{ permissionTarget?.name }}</p>
-            <p class="permission-copy">
-              保存后会整体替换该角色的权限；清空全部勾选即移除全部权限。
-            </p>
+            <p class="permission-copy">{{ permissionCopy }}</p>
           </div>
           <span class="permission-count">已选 {{ selectedPermissionCount }} 项</span>
         </div>
@@ -751,6 +817,7 @@ async function submitPermissions(): Promise<void> {
               <el-checkbox
                 :model-value="groupSelected(group)"
                 :indeterminate="groupIndeterminate(group)"
+                :disabled="permissionReadonly"
                 @change="toggleGroup(group, $event)"
               >
                 全选
@@ -763,6 +830,7 @@ async function submitPermissions(): Promise<void> {
                 :key="permission.id"
                 :model-value="permissionSelection.includes(permission.id)"
                 :value="permission.id"
+                :disabled="permissionReadonly"
                 :data-test="`role-permission-${permission.id}`"
                 @change="togglePermission(permission.id, $event)"
               >
@@ -774,8 +842,11 @@ async function submitPermissions(): Promise<void> {
         </div>
 
         <template #footer>
-          <el-button @click="permissionVisible = false">取消</el-button>
+          <el-button @click="permissionVisible = false">
+            {{ permissionReadonly ? '关闭' : '取消' }}
+          </el-button>
           <el-button
+            v-if="!permissionReadonly"
             type="primary"
             data-test="role-permission-submit"
             :disabled="permissionLoading || permissionListError !== null"
@@ -792,7 +863,7 @@ async function submitPermissions(): Promise<void> {
 
 <style scoped>
 .roles-table {
-  min-width: 1000px;
+  min-width: 1120px;
 }
 
 .role-identity {
@@ -802,6 +873,19 @@ async function submitPermissions(): Promise<void> {
 
 .role-identity strong {
   font-weight: var(--jp-font-weight-emphasis);
+}
+
+.role-identity-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.role-code {
+  color: var(--jp-color-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--jp-font-size-caption);
 }
 
 .role-identity span {

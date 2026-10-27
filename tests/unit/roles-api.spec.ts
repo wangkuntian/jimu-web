@@ -4,7 +4,7 @@ import type { Mock } from 'vitest'
 import {
   assignRolePermissions,
   createRole,
-  disableRole,
+  deleteRole,
   getRolePermissions,
   listPermissions,
   listRoles,
@@ -101,13 +101,13 @@ describe('roles api', () => {
     })
   })
 
-  it('accepts the 204 response used by role deactivation', async () => {
+  it('accepts the 204 response used by permanent role deletion', async () => {
     deleteMock.mockResolvedValueOnce({
       data: undefined,
       response: new Response(null, { status: 204 }),
     })
 
-    await expect(disableRole(role.id)).resolves.toBeUndefined()
+    await expect(deleteRole(role.id)).resolves.toBeUndefined()
     expect(deleteMock).toHaveBeenCalledWith('/roles/{id}', {
       params: { path: { id: role.id } },
     })

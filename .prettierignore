@@ -3,6 +3,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+.vitest/
 .cache/
 .codebase-memory/
 .pnpm-store/

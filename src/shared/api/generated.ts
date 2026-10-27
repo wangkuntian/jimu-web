@@ -158,7 +158,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.AuditLogPageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段） */
@@ -218,7 +218,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.AuditLogBodyResponse"];
                     };
                 };
                 /** @description 参数错误（ID 格式无效） */
@@ -2615,6 +2615,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roles/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取可分配角色选项
+         * @description 返回指定租户内启用且可分配给用户的角色摘要。租户身份只能读取当前租户。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description 目标租户 ID（平台管理员可选） */
+                    tenant_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回角色选项 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["application.RoleOptionListResponse"];
+                    };
+                };
+                /** @description 参数错误（tenant_id 格式无效） */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 跨租户访问 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 服务器内部错误 */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tenant-plans": {
         parameters: {
             query?: never;
@@ -3730,6 +3799,35 @@ export interface components {
         "application.AssignUserRolesRequest": {
             role_ids?: string[];
         };
+        "application.AuditLogBodyResponse": {
+            code?: number;
+            data?: components["schemas"]["application.AuditLogResponse"];
+            message?: string;
+            request_id?: string;
+        };
+        "application.AuditLogPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.AuditLogResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.AuditLogResponse": {
+            action?: string;
+            created_at?: string;
+            detail?: string;
+            id?: number;
+            ip?: string;
+            method?: string;
+            path?: string;
+            resource?: string;
+            status?: number;
+            tenant_id?: string;
+            user_id?: number;
+            username?: string;
+        };
         "application.BatchDeleteRequest": {
             ids: number[];
         };
@@ -3846,6 +3944,19 @@ export interface components {
             message?: string;
             request_id?: string;
         };
+        "application.RoleOptionListResponse": {
+            code?: number;
+            data?: components["schemas"]["application.RoleOptionResponse"][];
+            message?: string;
+            request_id?: string;
+        };
+        "application.RoleOptionResponse": {
+            code?: string;
+            id?: string;
+            is_system?: boolean;
+            name?: string;
+            scope?: components["schemas"]["contract.RoleScope"];
+        };
         "application.RolePageResponse": {
             code?: number;
             data?: components["schemas"]["application.RoleResponse"][];
@@ -3860,10 +3971,13 @@ export interface components {
             name?: string;
         };
         "application.RoleResponse": {
+            code?: string;
             created_at?: string;
             description?: string;
             id?: string;
+            is_system?: boolean;
             name?: string;
+            scope?: components["schemas"]["contract.RoleScope"];
             status?: number;
             tenant_id?: string;
             updated_at?: string;
@@ -3982,6 +4096,8 @@ export interface components {
             request_id?: string;
             total?: number;
         };
+        /** @enum {string} */
+        "contract.RoleScope": "platform" | "tenant";
         "contract.TokenPair": {
             access_token?: string;
             /** @description DeviceToken 仅在「记住此设备」成功签发时返回，客户端需安全保存。 */

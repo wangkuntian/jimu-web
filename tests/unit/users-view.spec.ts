@@ -10,8 +10,8 @@ import UsersView from '../../src/features/users/views/UsersView.vue'
 import ManagementPage from '../../src/shared/components/ManagementPage.vue'
 import {
   createUser,
-  disableUser,
-  listRoles,
+  deleteUser,
+  listRoleOptions,
   listTenantOptions,
   listUsers,
   updateUser,
@@ -33,18 +33,18 @@ vi.mock('../../src/features/users/api', () => ({
   getUser: vi.fn(),
   createUser: vi.fn(),
   updateUser: vi.fn(),
-  disableUser: vi.fn(),
+  deleteUser: vi.fn(),
   assignUserRoles: vi.fn(),
-  listRoles: vi.fn(),
+  listRoleOptions: vi.fn(),
   listTenantOptions: vi.fn(),
 }))
 
 const listUsersMock = vi.mocked(listUsers)
-const listRolesMock = vi.mocked(listRoles)
+const listRoleOptionsMock = vi.mocked(listRoleOptions)
 const listTenantOptionsMock = vi.mocked(listTenantOptions)
 const createUserMock = vi.mocked(createUser)
 const updateUserMock = vi.mocked(updateUser)
-const disableUserMock = vi.mocked(disableUser)
+const deleteUserMock = vi.mocked(deleteUser)
 const assignUserRolesMock = vi.mocked(assignUserRoles)
 
 const user: User = {
@@ -71,12 +71,10 @@ const tenant = {
 
 const role = {
   id: '370528943163310082',
-  tenant_id: tenant.id,
   name: 'developer',
-  description: '',
-  status: 1,
-  created_at: '',
-  updated_at: '',
+  code: '',
+  scope: 'tenant' as const,
+  is_system: false,
 }
 
 const baseIdentity: Identity = {
@@ -99,7 +97,7 @@ const fullAdminIdentity: Identity = {
     { resource: '/api/v1/users/*', action: 'PUT' },
     { resource: '/api/v1/users/*', action: 'DELETE' },
     { resource: '/api/v1/users/*/roles', action: 'POST' },
-    { resource: '/api/v1/roles', action: 'GET' },
+    { resource: '/api/v1/roles/options', action: 'GET' },
     { resource: '/api/v1/tenants', action: 'GET' },
   ],
 }
@@ -114,7 +112,7 @@ const tenantUserAdminIdentity: Identity = {
   permissions: [
     { resource: '/api/v1/users', action: 'GET' },
     { resource: '/api/v1/users', action: 'POST' },
-    { resource: '/api/v1/roles', action: 'GET' },
+    { resource: '/api/v1/roles/options', action: 'GET' },
   ],
 }
 
@@ -175,10 +173,10 @@ describe('UsersView', () => {
     ensureIdentityMock.mockReset()
     clearIdentity()
     listTenantOptionsMock.mockResolvedValue([tenant])
-    listRolesMock.mockResolvedValue([role])
+    listRoleOptionsMock.mockResolvedValue([role])
     createUserMock.mockResolvedValue(user)
     updateUserMock.mockResolvedValue()
-    disableUserMock.mockResolvedValue()
+    deleteUserMock.mockResolvedValue()
     assignUserRolesMock.mockResolvedValue()
   })
 
@@ -301,6 +299,14 @@ describe('UsersView', () => {
   })
 
   it('requires a tenant and submits the create payload with the selected role', async () => {
+    const systemRole = {
+      ...role,
+      id: 'role-tenant-admin',
+      name: '租户管理员',
+      code: 'tenant_admin',
+      is_system: true,
+    }
+    listRoleOptionsMock.mockResolvedValue([role, systemRole])
     saveIdentity(fullAdminIdentity)
     listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
     const wrapper = mountView()
@@ -319,7 +325,8 @@ describe('UsersView', () => {
     const tenantSelect = wrapper.findComponent('[data-test="user-create-tenant"]') as VueWrapper
     tenantSelect.vm.$emit('update:modelValue', tenant.id)
     tenantSelect.vm.$emit('change', tenant.id)
-    await vi.waitFor(() => expect(listRolesMock).toHaveBeenCalledWith(tenant.id))
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith(tenant.id))
+    expect(wrapper.text()).toContain('租户管理员（系统）')
 
     const roleSelect = wrapper.findComponent('[data-test="user-create-roles"]') as VueWrapper
     roleSelect.vm.$emit('update:modelValue', [role.id])
@@ -354,7 +361,7 @@ describe('UsersView', () => {
     const tenantSelect = wrapper.findComponent('[data-test="user-create-tenant"]') as VueWrapper
     tenantSelect.vm.$emit('update:modelValue', tenant.id)
     tenantSelect.vm.$emit('change', tenant.id)
-    await vi.waitFor(() => expect(listRolesMock).toHaveBeenCalledWith(tenant.id))
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith(tenant.id))
 
     const roleSelect = wrapper.findComponent('[data-test="user-create-roles"]') as VueWrapper
     roleSelect.vm.$emit('update:modelValue', [role.id])
@@ -382,7 +389,7 @@ describe('UsersView', () => {
     await wrapper.find('[data-test="user-create"]').trigger('click')
 
     expect(wrapper.find('[data-test="user-create-tenant"]').exists()).toBe(false)
-    await vi.waitFor(() => expect(listRolesMock).toHaveBeenCalledWith(undefined))
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith(undefined))
 
     await wrapper.find('input[data-test="user-create-username"]').setValue('bob')
     await wrapper.find('input[data-test="user-create-password"]').setValue('secret123')
@@ -431,7 +438,7 @@ describe('UsersView', () => {
     const secondRole = { ...role, id: 'role-2', name: 'reviewer' }
     saveIdentity(fullAdminIdentity)
     listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
-    listRolesMock.mockResolvedValue([role, secondRole])
+    listRoleOptionsMock.mockResolvedValue([role, secondRole])
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
@@ -439,7 +446,7 @@ describe('UsersView', () => {
       .findAll('button')
       .find((button) => button.text() === '角色')
       ?.trigger('click')
-    await vi.waitFor(() => expect(listRolesMock).toHaveBeenCalledWith(user.tenant.id))
+    await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith(user.tenant.id))
 
     const roleSelect = wrapper.findComponent('[data-test="user-role-select"]') as VueWrapper
     roleSelect.vm.$emit('update:modelValue', [secondRole.id])
@@ -450,7 +457,7 @@ describe('UsersView', () => {
     )
   })
 
-  it('confirms deactivation and calls the 204 endpoint', async () => {
+  it('stops a user with PUT and permanently deletes with DELETE', async () => {
     saveIdentity(fullAdminIdentity)
     listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
@@ -469,6 +476,19 @@ describe('UsersView', () => {
         expect.anything(),
       ),
     )
-    await vi.waitFor(() => expect(disableUserMock).toHaveBeenCalledWith(user.id))
+    await vi.waitFor(() => expect(updateUserMock).toHaveBeenLastCalledWith(user.id, { status: 0 }))
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '删除')
+      ?.trigger('click')
+    await vi.waitFor(() =>
+      expect(confirm).toHaveBeenLastCalledWith(
+        expect.stringContaining('删除后无法恢复'),
+        '删除用户',
+        expect.anything(),
+      ),
+    )
+    await vi.waitFor(() => expect(deleteUserMock).toHaveBeenCalledWith(user.id))
   })
 })

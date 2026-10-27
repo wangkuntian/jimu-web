@@ -105,7 +105,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.AuditLogPageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
           content:
@@ -139,7 +139,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.AuditLogBodyResponse"
         "400":
           description: 参数错误（ID 格式无效）
           content:
@@ -1577,6 +1577,45 @@ paths:
       summary: 分配角色权限
       tags:
         - 角色管理
+  /roles/options:
+    get:
+      description: 返回指定租户内启用且可分配给用户的角色摘要。租户身份只能读取当前租户。
+      parameters:
+        - description: 目标租户 ID（平台管理员可选）
+          in: query
+          name: tenant_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功，返回角色选项
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/application.RoleOptionListResponse"
+        "400":
+          description: 参数错误（tenant_id 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 跨租户访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "500":
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+      security:
+        - BearerAuth: []
+      summary: 获取可分配角色选项
+      tags:
+        - 角色管理
   /tenant-plans:
     get:
       description: 分页返回全部套餐定义。
@@ -2355,6 +2394,63 @@ components:
             type: string
           type: array
       type: object
+    application.AuditLogBodyResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/application.AuditLogResponse"
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.AuditLogPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.AuditLogResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.AuditLogResponse:
+      properties:
+        action:
+          type: string
+        created_at:
+          type: string
+        detail:
+          type: string
+        id:
+          type: integer
+        ip:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        resource:
+          type: string
+        status:
+          type: integer
+        tenant_id:
+          type: string
+        user_id:
+          type: integer
+        username:
+          type: string
+      type: object
     application.BatchDeleteRequest:
       properties:
         ids:
@@ -2613,6 +2709,32 @@ components:
         request_id:
           type: string
       type: object
+    application.RoleOptionListResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.RoleOptionResponse"
+          type: array
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.RoleOptionResponse:
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        is_system:
+          type: boolean
+        name:
+          type: string
+        scope:
+          $ref: "#/components/schemas/contract.RoleScope"
+      type: object
     application.RolePageResponse:
       properties:
         code:
@@ -2641,14 +2763,20 @@ components:
       type: object
     application.RoleResponse:
       properties:
+        code:
+          type: string
         created_at:
           type: string
         description:
           type: string
         id:
           type: string
+        is_system:
+          type: boolean
         name:
           type: string
+        scope:
+          $ref: "#/components/schemas/contract.RoleScope"
         status:
           type: integer
         tenant_id:
@@ -2882,6 +3010,14 @@ components:
         total:
           type: integer
       type: object
+    contract.RoleScope:
+      enum:
+        - platform
+        - tenant
+      type: string
+      x-enum-varnames:
+        - RoleScopePlatform
+        - RoleScopeTenant
     contract.TokenPair:
       properties:
         access_token:

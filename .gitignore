@@ -4,6 +4,7 @@ coverage/
 playwright-report/
 test-results/
 .vite/
+.vitest/
 .cache/
 .codebase-memory/
 # pnpm 在全局 store 不可写时会退回仓库内的本地 store（实测 300MB），不得提交

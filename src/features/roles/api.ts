@@ -59,8 +59,8 @@ export async function updateRole(id: string, input: UpdateRoleInput): Promise<vo
   unwrapOk(resolveEnvelope({ data, error, response }))
 }
 
-/** DELETE 表示停用，后端成功返回 204。 */
-export async function disableRole(id: string): Promise<void> {
+/** 永久删除自定义角色，后端成功返回 204。 */
+export async function deleteRole(id: string): Promise<void> {
   const { data, error, response } = await api.DELETE('/roles/{id}', {
     params: { path: { id } },
   })

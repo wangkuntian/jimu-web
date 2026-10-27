@@ -7,8 +7,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   assignUserRoles,
   createUser,
-  disableUser,
-  listRoles,
+  deleteUser,
+  listRoleOptions,
   listTenantOptions,
   listUsers,
   updateUser,
@@ -17,7 +17,7 @@ import { buildUserListQuery } from '../params'
 import type { UserFilters } from '../params'
 import { apiResource } from '../../../shared/api/config'
 import { ApiError, ErrorCode } from '../../../shared/api/unwrap'
-import type { Role, Tenant, User } from '../../../shared/api/types'
+import type { RoleOption, Tenant, User } from '../../../shared/api/types'
 import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
 import ManagementPage from '../../../shared/components/ManagementPage.vue'
@@ -26,7 +26,7 @@ import { clampPage } from '../../tenants/params'
 const canView = computed(() => hasPermission(apiResource('/users'), 'GET'))
 const canCreate = computed(() => hasPermission(apiResource('/users'), 'POST'))
 const canListTenants = computed(() => hasPermission(apiResource('/tenants'), 'GET'))
-const canListRoles = computed(() => hasPermission(apiResource('/roles'), 'GET'))
+const canListRoleOptions = computed(() => hasPermission(apiResource('/roles/options'), 'GET'))
 const identityStatus = computed(() => getIdentityStatus())
 const queryClient = useQueryClient()
 
@@ -57,16 +57,16 @@ const tenantOptionsQuery = useQuery({
 const roleTenantId = ref<string | undefined>(undefined)
 const rolesQuery = useQuery({
   queryKey: ['user-role-options', roleTenantId],
-  queryFn: () => listRoles(roleTenantId.value),
+  queryFn: () => listRoleOptions(roleTenantId.value),
   enabled: computed(
-    () => canListRoles.value && (!canListTenants.value || roleTenantId.value !== undefined),
+    () => canListRoleOptions.value && (!canListTenants.value || roleTenantId.value !== undefined),
   ),
 })
 
 const items = computed<User[]>(() => usersQuery.data.value?.items ?? [])
 const total = computed(() => usersQuery.data.value?.total ?? 0)
 const tenants = computed<Tenant[]>(() => tenantOptionsQuery.data.value ?? [])
-const roles = computed<Role[]>(() => rolesQuery.data.value ?? [])
+const roles = computed<RoleOption[]>(() => rolesQuery.data.value ?? [])
 
 const listError = computed(() => {
   const error = usersQuery.error.value
@@ -129,7 +129,7 @@ function canUpdate(row: User): boolean {
   return hasPermission(apiResource(`/users/${row.id}`), 'PUT')
 }
 
-function canDisable(row: User): boolean {
+function canDelete(row: User): boolean {
   return hasPermission(apiResource(`/users/${row.id}`), 'DELETE')
 }
 
@@ -139,6 +139,10 @@ function canAssignRoles(row: User): boolean {
 
 function roleNames(row: User): string {
   return row.roles.length > 0 ? row.roles.map((role) => role.name).join('、') : '未分配'
+}
+
+function roleOptionLabel(role: RoleOption): string {
+  return role.is_system ? `${role.name}（系统）` : role.name
 }
 
 function describeError(error: unknown): { message: string; requestId: string } {
@@ -312,12 +316,12 @@ async function submitRoles(): Promise<void> {
   }
 }
 
-const { mutateAsync: disableUserAsync } = useMutation({
-  mutationFn: (id: string) => disableUser(id),
+const { mutateAsync: stopUserAsync } = useMutation({
+  mutationFn: (user: User) => updateUser(user.id, { status: 0 }),
   onSuccess: invalidateUsers,
 })
 
-async function onDisable(row: User): Promise<void> {
+async function onStop(row: User): Promise<void> {
   try {
     await ElMessageBox.confirm(
       '停用后该用户将无法登录，账号数据仍会保留，可通过编辑重新启用。确认停用？',
@@ -333,8 +337,37 @@ async function onDisable(row: User): Promise<void> {
   }
 
   try {
-    await disableUserAsync(row.id)
+    await stopUserAsync(row)
     ElMessage.success('用户已停用')
+  } catch (error) {
+    const info = describeError(error)
+    ElMessage.error(withRequestId(info.message, info.requestId))
+  }
+}
+
+const { mutateAsync: deleteUserAsync } = useMutation({
+  mutationFn: (id: string) => deleteUser(id),
+  onSuccess: invalidateUsers,
+})
+
+async function onDelete(row: User): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '删除后无法恢复，账号会从用户列表中消失。未启用的账号如需保留请使用停用。确认删除该用户？',
+      '删除用户',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await deleteUserAsync(row.id)
+    ElMessage.success('用户已删除')
   } catch (error) {
     const info = describeError(error)
     ElMessage.error(withRequestId(info.message, info.requestId))
@@ -451,13 +484,13 @@ async function onDisable(row: User): Promise<void> {
 
         <el-table-column prop="created_at" label="创建时间" min-width="190" />
 
-        <el-table-column label="操作" min-width="220">
+        <el-table-column label="操作" min-width="280">
           <template #default="scope">
             <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
               编辑
             </el-button>
             <el-button
-              v-if="canAssignRoles(scope.row) && canListRoles"
+              v-if="canAssignRoles(scope.row) && canListRoleOptions"
               text
               type="primary"
               @click="openRoles(scope.row)"
@@ -465,12 +498,15 @@ async function onDisable(row: User): Promise<void> {
               角色
             </el-button>
             <el-button
-              v-if="canDisable(scope.row) && scope.row.status === 1"
+              v-if="canUpdate(scope.row) && scope.row.status === 1"
               text
               type="danger"
-              @click="onDisable(scope.row)"
+              @click="onStop(scope.row)"
             >
               停用
+            </el-button>
+            <el-button v-if="canDelete(scope.row)" text type="danger" @click="onDelete(scope.row)">
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -550,7 +586,7 @@ async function onDisable(row: User): Promise<void> {
             <el-input v-model="createForm.phone" autocomplete="off" data-test="user-create-phone" />
           </el-form-item>
 
-          <el-form-item v-if="canListRoles" label="角色">
+          <el-form-item v-if="canListRoleOptions" label="角色">
             <el-select
               v-model="createForm.roleIds"
               multiple
@@ -563,7 +599,7 @@ async function onDisable(row: User): Promise<void> {
               <el-option
                 v-for="roleOption in roles"
                 :key="roleOption.id"
-                :label="roleOption.name"
+                :label="roleOptionLabel(roleOption)"
                 :value="roleOption.id"
               />
             </el-select>
@@ -650,7 +686,7 @@ async function onDisable(row: User): Promise<void> {
           <el-option
             v-for="roleOption in roles"
             :key="roleOption.id"
-            :label="roleOption.name"
+            :label="roleOptionLabel(roleOption)"
             :value="roleOption.id"
           />
         </el-select>

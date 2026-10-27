@@ -58,6 +58,9 @@ export type RoleRef = Required<Schemas['application.RoleRef']>
 /** 角色；契约 application.RoleResponse。 */
 export type Role = Required<Schemas['application.RoleResponse']>
 
+/** 可分配角色选项；契约 application.RoleOptionResponse。 */
+export type RoleOption = Required<Schemas['application.RoleOptionResponse']>
+
 /** 权限；契约 application.PermissionResponse。 */
 export type Permission = Required<Schemas['application.PermissionResponse']>
 

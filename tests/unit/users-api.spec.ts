@@ -4,9 +4,9 @@ import type { Mock } from 'vitest'
 import {
   assignUserRoles,
   createUser,
-  disableUser,
+  deleteUser,
   getUser,
-  listRoles,
+  listRoleOptions,
   listTenantOptions,
   listUsers,
   updateUser,
@@ -103,13 +103,13 @@ describe('users api', () => {
     })
   })
 
-  it('accepts the 204 response used by user deactivation', async () => {
+  it('accepts the 204 response used by user deletion', async () => {
     deleteMock.mockResolvedValueOnce({
       data: undefined,
       response: new Response(null, { status: 204 }),
     })
 
-    await expect(disableUser(user.id)).resolves.toBeUndefined()
+    await expect(deleteUser(user.id)).resolves.toBeUndefined()
     expect(deleteMock).toHaveBeenCalledWith('/users/{id}', {
       params: { path: { id: user.id } },
     })
@@ -128,39 +128,26 @@ describe('users api', () => {
     })
   })
 
-  it('lists roles only for the selected tenant', async () => {
+  it('lists assignable role options for the selected tenant', async () => {
     getMock.mockResolvedValueOnce({
       data: {
         code: 0,
         data: [
           {
             id: 'r1',
-            tenant_id: 't1',
             name: 'developer',
-            description: '',
-            status: 1,
-            created_at: '',
-            updated_at: '',
+            code: '',
+            scope: 'tenant',
+            is_system: false,
           },
         ],
-        total: 1,
-        page: 1,
-        page_size: 100,
       },
       response: new Response(null, { status: 200 }),
     })
 
-    await expect(listRoles('t1')).resolves.toMatchObject([{ id: 'r1', name: 'developer' }])
-    expect(getMock).toHaveBeenCalledWith('/roles', {
-      params: {
-        query: {
-          page: 1,
-          page_size: 100,
-          sort: 'id',
-          order: 'asc',
-          tenant_id: 't1',
-        },
-      },
+    await expect(listRoleOptions('t1')).resolves.toMatchObject([{ id: 'r1', name: 'developer' }])
+    expect(getMock).toHaveBeenCalledWith('/roles/options', {
+      params: { query: { tenant_id: 't1' } },
     })
   })
 
@@ -169,23 +156,13 @@ describe('users api', () => {
       data: {
         code: 0,
         data: [],
-        total: 0,
-        page: 1,
-        page_size: 100,
       },
       response: new Response(null, { status: 200 }),
     })
 
-    await expect(listRoles()).resolves.toEqual([])
-    expect(getMock).toHaveBeenCalledWith('/roles', {
-      params: {
-        query: {
-          page: 1,
-          page_size: 100,
-          sort: 'id',
-          order: 'asc',
-        },
-      },
+    await expect(listRoleOptions()).resolves.toEqual([])
+    expect(getMock).toHaveBeenCalledWith('/roles/options', {
+      params: { query: {} },
     })
   })
 
@@ -253,53 +230,6 @@ describe('users api', () => {
       })
 
     await expect(listTenantOptions()).resolves.toHaveLength(2)
-    expect(getMock.mock.calls.map(([, init]) => init.params.query.page)).toEqual([1, 2])
-  })
-
-  it('loads every role option page when the total exceeds 100', async () => {
-    getMock
-      .mockResolvedValueOnce({
-        data: {
-          code: 0,
-          data: [
-            {
-              id: 'r1',
-              tenant_id: 't1',
-              name: 'developer',
-              description: '',
-              status: 1,
-              created_at: '',
-              updated_at: '',
-            },
-          ],
-          total: 101,
-          page: 1,
-          page_size: 100,
-        },
-        response: new Response(null, { status: 200 }),
-      })
-      .mockResolvedValueOnce({
-        data: {
-          code: 0,
-          data: [
-            {
-              id: 'r101',
-              tenant_id: 't1',
-              name: 'last',
-              description: '',
-              status: 1,
-              created_at: '',
-              updated_at: '',
-            },
-          ],
-          total: 101,
-          page: 2,
-          page_size: 100,
-        },
-        response: new Response(null, { status: 200 }),
-      })
-
-    await expect(listRoles('t1')).resolves.toHaveLength(2)
     expect(getMock.mock.calls.map(([, init]) => init.params.query.page)).toEqual([1, 2])
   })
 })

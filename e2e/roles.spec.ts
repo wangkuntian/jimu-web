@@ -7,9 +7,22 @@ const role = {
   tenant_id: '1',
   name: '运营管理员',
   description: '负责租户运营',
+  code: '',
+  scope: 'tenant',
+  is_system: false,
   status: 1,
   created_at: '2026-10-19T00:00:00Z',
   updated_at: '2026-10-19T00:00:00Z',
+}
+
+const systemRole = {
+  ...role,
+  id: '370528943163310090',
+  name: '平台超级管理员',
+  description: '平台最高权限',
+  code: 'platform_super_admin',
+  scope: 'platform',
+  is_system: true,
 }
 
 const tenants = {
@@ -49,6 +62,8 @@ const userCreatePermission = {
 
 test('manages roles with the shared admin page and replaces permissions', async ({ page }) => {
   let permissionPayload: unknown
+  let deletePayload = ''
+  let updatePayload: unknown
   const identity = {
     ...ADMIN_IDENTITY,
     permissions: [
@@ -87,13 +102,30 @@ test('manages roles with the shared admin page and replaces permissions', async 
       body: JSON.stringify({
         code: 0,
         message: 'ok',
-        data: [role],
-        total: 1,
+        data: [role, systemRole],
+        total: 2,
         page: 1,
         page_size: 20,
       }),
     }),
   )
+  await page.route(/\/api\/v1\/roles\/[^/]+$/, async (route) => {
+    if (route.request().method() === 'PUT') {
+      updatePayload = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok' }),
+      })
+      return
+    }
+    if (route.request().method() === 'DELETE') {
+      deletePayload = new URL(route.request().url()).pathname.split('/').at(-1) ?? ''
+      await route.fulfill({ status: 204 })
+      return
+    }
+    await route.fallback()
+  })
   await page.route(/\/api\/v1\/permissions(\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
@@ -123,8 +155,15 @@ test('manages roles with the shared admin page and replaces permissions', async 
   await expect(
     page.locator('.sidebar-menu').getByRole('menuitem', { name: '角色管理', exact: true }),
   ).toBeVisible()
+  const customRow = page.getByRole('row', { name: /运营管理员/ })
   await expect(page.getByTestId('roles-table')).toContainText('运营管理员')
   await expect(page.getByTestId('roles-table')).toContainText('默认租户')
+  const systemRow = page.getByRole('row', { name: /平台超级管理员/ })
+  await expect(systemRow).toContainText('platform_super_admin')
+  await expect(systemRow).toContainText('系统')
+  await expect(systemRow.getByRole('button', { name: '编辑' })).toHaveCount(0)
+  await expect(systemRow.getByRole('button', { name: '停用' })).toHaveCount(0)
+  await expect(systemRow.getByRole('button', { name: '查看权限' })).toBeVisible()
 
   await page
     .getByRole('row', { name: /运营管理员/ })
@@ -142,4 +181,25 @@ test('manages roles with the shared admin page and replaces permissions', async 
     .toEqual({
       permission_ids: [userListPermission.id, userCreatePermission.id],
     })
+
+  await systemRow.getByRole('button', { name: '查看权限' }).click()
+  const readOnlyDrawer = page.locator('.el-drawer').filter({ hasText: '查看权限' })
+  await expect(readOnlyDrawer).toBeVisible()
+  await expect(readOnlyDrawer.getByText('系统角色的权限由后端维护，不可在此修改')).toBeVisible()
+  await expect(readOnlyDrawer.getByRole('button', { name: '保存权限' })).toHaveCount(0)
+  await readOnlyDrawer.getByRole('button', { name: '关闭' }).click()
+
+  await customRow.getByRole('button', { name: '停用' }).click()
+  await page.locator('.el-message-box').getByRole('button', { name: '停用' }).click()
+  await expect
+    .poll(() => updatePayload)
+    .toEqual({
+      name: role.name,
+      description: role.description,
+      status: 0,
+    })
+
+  await customRow.getByRole('button', { name: '删除' }).click()
+  await page.locator('.el-message-box').getByRole('button', { name: '删除' }).click()
+  await expect.poll(() => deletePayload).toBe(role.id)
 })
