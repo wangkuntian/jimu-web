@@ -176,6 +176,13 @@ function invalidateUsers(): Promise<void> {
   return queryClient.invalidateQueries({ queryKey: ['users'] })
 }
 
+async function invalidateAfterUserDelete(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['users'] }),
+    queryClient.invalidateQueries({ queryKey: ['roles'] }),
+  ])
+}
+
 const createVisible = ref(false)
 const createError = ref('')
 const createRequestId = ref('')
@@ -368,7 +375,7 @@ async function onStop(row: User): Promise<void> {
 
 const { mutateAsync: deleteUserAsync } = useMutation({
   mutationFn: (id: string) => deleteUser(id),
-  onSuccess: invalidateUsers,
+  onSuccess: invalidateAfterUserDelete,
 })
 
 async function onDelete(row: User): Promise<void> {

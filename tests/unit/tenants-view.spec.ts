@@ -9,6 +9,7 @@ import TenantsView from '../../src/features/tenants/views/TenantsView.vue'
 import ManagementPage from '../../src/shared/components/ManagementPage.vue'
 import {
   assignTenantPlan,
+  deleteTenant,
   listPlans,
   listTenants,
   updateTenant,
@@ -36,6 +37,7 @@ vi.mock('../../src/features/tenants/api', () => ({
 
 const listTenantsMock = vi.mocked(listTenants)
 const listPlansMock = vi.mocked(listPlans)
+const deleteTenantMock = vi.mocked(deleteTenant)
 const updateTenantMock = vi.mocked(updateTenant)
 const assignTenantPlanMock = vi.mocked(assignTenantPlan)
 
@@ -132,6 +134,7 @@ describe('TenantsView', () => {
     ensureIdentityMock.mockReset()
     clearIdentity()
     listPlansMock.mockResolvedValue([])
+    deleteTenantMock.mockResolvedValue()
   })
 
   it('renders the no-permission state without issuing a request', async () => {
@@ -278,6 +281,32 @@ describe('TenantsView', () => {
     await wrapper.find('[data-test="tenant-edit-submit"]').trigger('click')
 
     await vi.waitFor(() => expect(queryClient.getQueryState(['users'])?.isInvalidated).toBe(true))
+  })
+
+  it('invalidates tenant, user, and role caches after a tenant delete', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme' }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(['tenants', 'options'], [])
+    queryClient.setQueryData(['users'], { items: [], total: 0 })
+    queryClient.setQueryData(['roles'], { items: [], total: 0 })
+    const wrapper = mountView(queryClient)
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    await buttonByText(wrapper, '删除')?.trigger('click')
+
+    await vi.waitFor(() => expect(deleteTenantMock).toHaveBeenCalledWith('2'))
+    await vi.waitFor(() => {
+      expect(queryClient.getQueryState(['tenants', 'options'])?.isInvalidated).toBe(true)
+      expect(queryClient.getQueryState(['users'])?.isInvalidated).toBe(true)
+      expect(queryClient.getQueryState(['roles'])?.isInvalidated).toBe(true)
+    })
   })
 
   it('renders a retryable error state that keeps the request id', async () => {

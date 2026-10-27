@@ -186,6 +186,14 @@ async function invalidateList(): Promise<void> {
   ])
 }
 
+async function invalidateAfterTenantDelete(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['tenants'] }),
+    queryClient.invalidateQueries({ queryKey: ['users'] }),
+    queryClient.invalidateQueries({ queryKey: ['roles'] }),
+  ])
+}
+
 const createVisible = ref(false)
 const createForm = reactive({ code: '', name: '' })
 const createError = ref('')
@@ -326,7 +334,7 @@ async function submitPlan(): Promise<void> {
 
 const { mutateAsync: deleteTenantAsync } = useMutation({
   mutationFn: (id: string) => deleteTenant(id),
-  onSuccess: invalidateList,
+  onSuccess: invalidateAfterTenantDelete,
 })
 
 async function onDelete(row: Tenant): Promise<void> {

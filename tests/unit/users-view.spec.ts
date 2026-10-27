@@ -624,7 +624,9 @@ describe('UsersView', () => {
     saveIdentity(fullAdminIdentity)
     listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
-    const wrapper = mountView()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(['roles'], { items: [], total: 0 })
+    const wrapper = mountView(queryClient)
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
     await wrapper
@@ -653,5 +655,6 @@ describe('UsersView', () => {
       ),
     )
     await vi.waitFor(() => expect(deleteUserMock).toHaveBeenCalledWith(user.id))
+    await vi.waitFor(() => expect(queryClient.getQueryState(['roles'])?.isInvalidated).toBe(true))
   })
 })
