@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus, { ElMessageBox } from 'element-plus'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import RolesView from '../../src/features/roles/views/RolesView.vue'
@@ -47,6 +47,7 @@ const listPermissionsMock = vi.mocked(listPermissions)
 const getRolePermissionsMock = vi.mocked(getRolePermissions)
 const assignRolePermissionsMock = vi.mocked(assignRolePermissions)
 const listTenantOptionsMock = vi.mocked(listTenantOptions)
+const mountedWrappers: Array<{ unmount: () => void }> = []
 
 const tenant: Tenant = {
   id: '1',
@@ -138,7 +139,9 @@ function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number)
   pagination.vm.$emit('current-change', page)
 }
 
-function mountView() {
+function mountView(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -147,16 +150,9 @@ function mountView() {
     ],
   })
 
-  return mount(RolesView, {
+  const wrapper = mount(RolesView, {
     global: {
-      plugins: [
-        ElementPlus,
-        router,
-        [
-          VueQueryPlugin,
-          { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-        ],
-      ],
+      plugins: [ElementPlus, router, [VueQueryPlugin, { queryClient }]],
       stubs: {
         teleport: true,
         ElDrawer: {
@@ -165,7 +161,7 @@ function mountView() {
             '<section v-if="modelValue"><h2>{{ title }}</h2><slot /><slot name="footer" /></section>',
         },
         ElSelect: {
-          props: ['modelValue', 'loading'],
+          props: ['modelValue', 'loading', 'disabled'],
           emits: ['update:modelValue', 'change'],
           template: '<div class="el-select-stub"><slot /></div>',
         },
@@ -181,6 +177,8 @@ function mountView() {
       },
     },
   })
+  mountedWrappers.push(wrapper)
+  return wrapper
 }
 
 describe('RolesView', () => {
@@ -197,6 +195,10 @@ describe('RolesView', () => {
     getRolePermissionsMock.mockResolvedValue([userListPermission])
     assignRolePermissionsMock.mockResolvedValue()
     listTenantOptionsMock.mockResolvedValue([tenant])
+  })
+
+  afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
   })
 
   it('renders the shared management page and role table', async () => {
@@ -273,6 +275,84 @@ describe('RolesView', () => {
         description: '只读审计',
       }),
     )
+  })
+
+  it('uses active-only tenants for creation while keeping all tenants for filtering', async () => {
+    const disabledTenant: Tenant = {
+      ...tenant,
+      id: '2',
+      code: 'disabled',
+      name: '已停用租户',
+      status: 0,
+    }
+    listTenantOptionsMock.mockResolvedValue([tenant, disabledTenant])
+    saveIdentity(roleAdminIdentity)
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
+    await vi.waitFor(() => expect(listTenantOptionsMock).toHaveBeenCalledTimes(1))
+    expect(listTenantOptionsMock.mock.calls[0]).toEqual([])
+
+    const filter = wrapper.findComponent('[data-test="role-tenant-filter"]')
+    expect(filter.text()).toContain('默认租户')
+    expect(filter.text()).toContain('已停用租户')
+
+    await wrapper.find('[data-test="role-create"]').trigger('click')
+    const createTenant = wrapper.findComponent('[data-test="role-create-tenant"]')
+    expect(createTenant.text()).toContain('默认租户')
+    expect(createTenant.text()).not.toContain('已停用租户')
+  })
+
+  it('shows active tenant option failures and disables role creation until retry succeeds', async () => {
+    listTenantOptionsMock
+      .mockRejectedValueOnce(
+        new ApiError(ErrorCode.internal, '租户选项加载失败', 'req-role-tenants'),
+      )
+      .mockResolvedValueOnce([tenant])
+    saveIdentity(roleAdminIdentity)
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
+    const error = await vi.waitFor(() => {
+      const node = wrapper.find('[data-test="role-tenant-options-error"]')
+      expect(node.exists()).toBe(true)
+      return node
+    })
+    expect(error.text()).toContain('租户选项加载失败')
+    expect(error.text()).toContain('req-role-tenants')
+
+    await wrapper.find('[data-test="role-create"]').trigger('click')
+    await wrapper.find('input[data-test="role-create-name"]').setValue('审计员')
+    const tenantSelect = wrapper.findComponent('[data-test="role-create-tenant"]') as VueWrapper
+    expect((tenantSelect.props() as { disabled?: boolean }).disabled).toBe(true)
+    expect(wrapper.find('[data-test="role-create-submit"]').attributes('disabled')).toBeDefined()
+
+    await error.find('button').trigger('click')
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="role-tenant-options-error"]').exists()).toBe(false),
+    )
+    expect((tenantSelect.props() as { disabled?: boolean }).disabled).toBe(false)
+    tenantSelect.vm.$emit('update:modelValue', tenant.id)
+    tenantSelect.vm.$emit('change', tenant.id)
+    await vi.waitFor(() =>
+      expect(
+        wrapper.find('[data-test="role-create-submit"]').attributes('disabled'),
+      ).toBeUndefined(),
+    )
+  })
+
+  it('invalidates cached users after a role update', async () => {
+    saveIdentity(roleAdminIdentity)
+    updateRoleMock.mockResolvedValue()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(['users'], { items: [], total: 0 })
+    const wrapper = mountView(queryClient)
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
+    await buttonByText(wrapper, '编辑')?.trigger('click')
+    await wrapper.find('[data-test="role-edit-submit"]').trigger('click')
+
+    await vi.waitFor(() => expect(queryClient.getQueryState(['users'])?.isInvalidated).toBe(true))
   })
 
   it('edits, stops, and permanently deletes a custom role', async () => {

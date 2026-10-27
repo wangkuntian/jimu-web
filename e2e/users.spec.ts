@@ -13,6 +13,14 @@ const tenant = {
   updated_at: '2026-10-19T00:00:00Z',
 }
 
+const disabledTenant = {
+  ...tenant,
+  id: 'tenant-disabled',
+  code: 'disabled',
+  name: '已停用租户',
+  status: 0,
+}
+
 const user = {
   id: 'user-1',
   username: 'alice',
@@ -47,10 +55,11 @@ interface CapturedPayloads {
   updates: unknown[]
   roles?: unknown
   deleted: string[]
+  tenantListUrls: string[]
 }
 
 async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
-  const payloads: CapturedPayloads = { updates: [], deleted: [] }
+  const payloads: CapturedPayloads = { updates: [], deleted: [], tenantListUrls: [] }
 
   await page.route('**/api/v1/users**', async (route) => {
     const request = route.request()
@@ -115,20 +124,24 @@ async function setupUserRoutes(page: Page): Promise<CapturedPayloads> {
     })
   })
 
-  await page.route(/\/api\/v1\/tenants(\?.*)?$/, (route) =>
-    route.fulfill({
+  await page.route(/\/api\/v1\/tenants(\?.*)?$/, (route) => {
+    const url = new URL(route.request().url())
+    payloads.tenantListUrls.push(url.toString())
+    const status = url.searchParams.get('status')
+    const data = status === '1' ? [tenant] : [tenant, disabledTenant]
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         code: 0,
         message: 'ok',
-        data: [tenant],
-        total: 1,
+        data,
+        total: data.length,
         page: 1,
         page_size: 100,
       }),
-    }),
-  )
+    })
+  })
 
   await page.route(/\/api\/v1\/roles\/options(\?.*)?$/, (route) =>
     route.fulfill({
@@ -181,6 +194,35 @@ test('creates a platform user inside the selected tenant', async ({ page }) => {
     phone: '',
     role_ids: ['role-reviewer'],
   })
+})
+
+test('offers only active tenants when creating users but keeps all tenants in filters', async ({
+  page,
+}) => {
+  const payloads = await setupUserRoutes(page)
+  await seedSession(page)
+  await page.goto('/admin/users')
+  await expect(page.getByTestId('users-table')).toContainText('alice')
+
+  await page.getByTestId('user-tenant-filter').locator('.el-select__wrapper').click()
+  await expect(page.getByRole('option', { name: 'Acme', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: '已停用租户', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByTestId('user-create').click()
+  const drawer = page.locator('.el-drawer').filter({ hasText: '新建用户' })
+  await drawer
+    .locator('.el-form-item')
+    .filter({ hasText: '所属租户' })
+    .locator('.el-select__wrapper')
+    .click()
+  const visibleOptions = page.locator('.el-select-dropdown:visible')
+  await expect(visibleOptions.getByRole('option', { name: 'Acme', exact: true })).toBeVisible()
+  await expect(visibleOptions.getByRole('option', { name: '已停用租户', exact: true })).toHaveCount(
+    0,
+  )
+  expect(payloads.tenantListUrls).toHaveLength(1)
+  expect(new URL(payloads.tenantListUrls[0]!).searchParams.has('status')).toBe(false)
 })
 
 test('shows role option failures and disables role assignment', async ({ page }) => {

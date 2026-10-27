@@ -50,7 +50,7 @@ const usersQuery = useQuery({
 
 const tenantOptionsQuery = useQuery({
   queryKey: ['tenants', 'options'],
-  queryFn: listTenantOptions,
+  queryFn: () => listTenantOptions(),
   enabled: canListTenants,
 })
 
@@ -66,6 +66,7 @@ const rolesQuery = useQuery({
 const items = computed<User[]>(() => usersQuery.data.value?.items ?? [])
 const total = computed(() => usersQuery.data.value?.total ?? 0)
 const tenants = computed<Tenant[]>(() => tenantOptionsQuery.data.value ?? [])
+const activeTenants = computed(() => tenants.value.filter((tenant) => tenant.status === 1))
 const roles = computed<RoleOption[]>(() => rolesQuery.data.value ?? [])
 
 const listError = computed(() => {
@@ -437,6 +438,8 @@ async function onDelete(row: User): Promise<void> {
           clearable
           placeholder="全部租户"
           data-test="user-tenant-filter"
+          :loading="tenantOptionsQuery.isPending.value"
+          :disabled="tenantOptionsError !== null"
           @change="resetPage"
         >
           <el-option
@@ -460,6 +463,16 @@ async function onDelete(row: User): Promise<void> {
           <el-option label="启用" :value="1" />
           <el-option label="停用" :value="0" />
         </el-select>
+      </el-form-item>
+
+      <el-form-item v-if="tenantOptionsError" class="management-filter-error">
+        <div class="option-error" data-test="user-tenant-options-error">
+          <el-alert type="error" :closable="false" show-icon :title="tenantOptionsError.message" />
+          <p v-if="tenantOptionsError.requestId" class="request-id">
+            请求编号：{{ tenantOptionsError.requestId }}
+          </p>
+          <el-button text type="primary" @click="tenantOptionsQuery.refetch()">重试</el-button>
+        </div>
       </el-form-item>
 
       <el-form-item class="management-filter-actions">
@@ -566,25 +579,13 @@ async function onDelete(row: User): Promise<void> {
               @change="onTargetTenantChange"
             >
               <el-option
-                v-for="tenantOption in tenants"
+                v-for="tenantOption in activeTenants"
                 :key="tenantOption.id"
                 :label="tenantOption.name"
                 :value="tenantOption.id"
               />
             </el-select>
           </el-form-item>
-          <div v-if="tenantOptionsError" class="option-error" data-test="user-tenant-options-error">
-            <el-alert
-              type="error"
-              :closable="false"
-              show-icon
-              :title="tenantOptionsError.message"
-            />
-            <p v-if="tenantOptionsError.requestId" class="request-id">
-              请求编号：{{ tenantOptionsError.requestId }}
-            </p>
-            <el-button text type="primary" @click="tenantOptionsQuery.refetch()">重试</el-button>
-          </div>
 
           <el-form-item label="用户名" required>
             <el-input
@@ -804,6 +805,10 @@ async function onDelete(row: User): Promise<void> {
   justify-items: start;
   gap: 8px;
   margin: -4px 0 16px;
+}
+
+.management-filter-error {
+  width: 100%;
 }
 
 .user-edit-summary {

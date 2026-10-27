@@ -1,13 +1,18 @@
 import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessageBox } from 'element-plus'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import TenantsView from '../../src/features/tenants/views/TenantsView.vue'
 import ManagementPage from '../../src/shared/components/ManagementPage.vue'
-import { listPlans, listTenants } from '../../src/features/tenants/api'
+import {
+  assignTenantPlan,
+  listPlans,
+  listTenants,
+  updateTenant,
+} from '../../src/features/tenants/api'
 import { ApiError, ErrorCode } from '../../src/shared/api/unwrap'
 import { clearIdentity, saveIdentity, setIdentityStatus } from '../../src/shared/auth/session'
 import type { Identity } from '../../src/shared/api/types'
@@ -31,6 +36,8 @@ vi.mock('../../src/features/tenants/api', () => ({
 
 const listTenantsMock = vi.mocked(listTenants)
 const listPlansMock = vi.mocked(listPlans)
+const updateTenantMock = vi.mocked(updateTenant)
+const assignTenantPlanMock = vi.mocked(assignTenantPlan)
 
 const tenant = {
   id: '1',
@@ -102,7 +109,9 @@ function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number)
   pagination.vm.$emit('current-change', page)
 }
 
-function mountView() {
+function mountView(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -112,14 +121,7 @@ function mountView() {
   })
   return mount(TenantsView, {
     global: {
-      plugins: [
-        ElementPlus,
-        router,
-        [
-          VueQueryPlugin,
-          { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-        ],
-      ],
+      plugins: [ElementPlus, router, [VueQueryPlugin, { queryClient }]],
     },
   })
 }
@@ -191,6 +193,93 @@ describe('TenantsView', () => {
     expect(wrapper.text()).toContain('专业版')
   })
 
+  it('shows plan loading failures with request id and disables saving until retry succeeds', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: 2 }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    listPlansMock
+      .mockRejectedValueOnce(new ApiError(ErrorCode.internal, '套餐加载失败', 'req-plan-options'))
+      .mockResolvedValueOnce([
+        { id: 2, code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
+      ])
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    await buttonByText(wrapper, '分配套餐')?.trigger('click')
+    const error = await vi.waitFor(() => {
+      const node = wrapper.find('[data-test="tenant-plans-error"]')
+      expect(node.exists()).toBe(true)
+      return node
+    })
+    expect(error.text()).toContain('套餐加载失败')
+    expect(error.text()).toContain('req-plan-options')
+    expect(wrapper.find('[data-test="tenant-plan-submit"]').attributes('disabled')).toBeDefined()
+
+    await error.find('button').trigger('click')
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="tenant-plans-error"]').exists()).toBe(false),
+    )
+    expect(wrapper.find('[data-test="tenant-plan-submit"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('asks for confirmation before disabling an enabled tenant', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme' }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    updateTenantMock.mockResolvedValue()
+    const confirm = vi
+      .spyOn(ElMessageBox, 'confirm')
+      .mockRejectedValueOnce('cancel')
+      .mockResolvedValueOnce('confirm' as never)
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    await buttonByText(wrapper, '编辑')?.trigger('click')
+    const statusSelect = wrapper.findComponent('[data-test="tenant-edit-status"]') as VueWrapper
+    statusSelect.vm.$emit('update:modelValue', 0)
+    await wrapper.find('[data-test="tenant-edit-submit"]').trigger('click')
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('停用后该租户'),
+      '停用租户',
+      expect.anything(),
+    )
+    expect(updateTenantMock).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-test="tenant-edit-submit"]').trigger('click')
+    await vi.waitFor(() =>
+      expect(updateTenantMock).toHaveBeenCalledWith('2', { name: 'Acme', status: 0 }),
+    )
+  })
+
+  it('invalidates cached users after a tenant update', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme' }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    updateTenantMock.mockResolvedValue()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(['users'], { items: [], total: 0 })
+    const wrapper = mountView(queryClient)
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    await buttonByText(wrapper, '编辑')?.trigger('click')
+    await wrapper.find('[data-test="tenant-edit-submit"]').trigger('click')
+
+    await vi.waitFor(() => expect(queryClient.getQueryState(['users'])?.isInvalidated).toBe(true))
+  })
+
   it('renders a retryable error state that keeps the request id', async () => {
     saveIdentity(adminIdentity)
     listTenantsMock.mockRejectedValue(new ApiError(ErrorCode.internal, '服务器内部错误', 'req-8'))
@@ -210,14 +299,31 @@ describe('TenantsView', () => {
     expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('分配套餐')
   })
 
-  it('renders the assign-plan action from the PUT /tenants/{id}/plan grant without listing plans', async () => {
+  it('allows cancelling a plan from the PUT grant without listing plans', async () => {
     saveIdentity(planAssignerIdentity)
-    listTenantsMock.mockResolvedValue({ items: [tenant], total: 1, page: 1, pageSize: 20 })
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: 2 }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    assignTenantPlanMock.mockResolvedValue()
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('分配套餐')
     expect(listPlansMock).not.toHaveBeenCalled()
+
+    await buttonByText(wrapper, '分配套餐')?.trigger('click')
+    expect(wrapper.find('[data-test="tenant-plans-permission"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('当前套餐 #2')
+
+    const planSelect = wrapper.findComponent('[data-test="tenant-plan-select"]') as VueWrapper
+    expect((planSelect.props() as { disabled?: boolean }).disabled).toBe(false)
+    planSelect.vm.$emit('update:modelValue', 0)
+    await wrapper.find('[data-test="tenant-plan-submit"]').trigger('click')
+
+    await vi.waitFor(() => expect(assignTenantPlanMock).toHaveBeenCalledWith('2', 0))
   })
 
   it('hides the edit and delete row actions without per-row PUT/DELETE permissions', async () => {

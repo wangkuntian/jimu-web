@@ -58,13 +58,14 @@ const rolesQuery = useQuery({
 
 const tenantOptionsQuery = useQuery({
   queryKey: ['tenants', 'options'],
-  queryFn: listTenantOptions,
+  queryFn: () => listTenantOptions(),
   enabled: canListTenants,
 })
 
 const items = computed<Role[]>(() => rolesQuery.data.value?.items ?? [])
 const total = computed(() => rolesQuery.data.value?.total ?? 0)
 const tenants = computed<Tenant[]>(() => tenantOptionsQuery.data.value ?? [])
+const activeTenants = computed(() => tenants.value.filter((tenant) => tenant.status === 1))
 const tenantNames = computed(() => new Map(tenants.value.map((tenant) => [tenant.id, tenant.name])))
 
 const listError = computed(() => {
@@ -125,7 +126,7 @@ async function retryIdentity(): Promise<void> {
 }
 
 function tenantName(tenantId: string): string {
-  return tenantNames.value.get(tenantId) ?? `#${tenantId}`
+  return tenantNames.value.get(tenantId) ?? `租户 #${tenantId}`
 }
 
 function canUpdate(row: Role): boolean {
@@ -161,9 +162,21 @@ function withRequestId(message: string, requestId: string): string {
   return requestId === '' ? message : `${message}（请求编号：${requestId}）`
 }
 
-function invalidateRoles(): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: ['roles'] })
+async function invalidateRoles(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['roles'] }),
+    queryClient.invalidateQueries({ queryKey: ['users'] }),
+  ])
 }
+
+const tenantOptionsError = computed(() =>
+  tenantOptionsQuery.isError.value ? describeError(tenantOptionsQuery.error.value) : null,
+)
+const tenantOptionsUnavailable = computed(
+  () =>
+    canListTenants.value &&
+    (tenantOptionsQuery.isPending.value || tenantOptionsQuery.isError.value),
+)
 
 const createVisible = ref(false)
 const createForm = reactive({
@@ -173,7 +186,10 @@ const createForm = reactive({
 })
 const createError = ref('')
 const createRequestId = ref('')
-const canSubmitCreate = computed(() => createForm.tenantId !== '' && createForm.name.trim() !== '')
+const canSubmitCreate = computed(
+  () =>
+    !tenantOptionsUnavailable.value && createForm.tenantId !== '' && createForm.name.trim() !== '',
+)
 
 const { isPending: creating, mutateAsync: createRoleAsync } = useMutation({
   mutationFn: () =>
@@ -519,6 +535,7 @@ async function submitPermissions(): Promise<void> {
           placeholder="全部租户"
           data-test="role-tenant-filter"
           :loading="tenantOptionsQuery.isPending.value"
+          :disabled="tenantOptionsError !== null"
           @change="resetPage"
         >
           <el-option
@@ -557,6 +574,16 @@ async function submitPermissions(): Promise<void> {
           <el-option label="启用" :value="1" />
           <el-option label="停用" :value="0" />
         </el-select>
+      </el-form-item>
+
+      <el-form-item v-if="tenantOptionsError" class="management-filter-error">
+        <div class="option-error" data-test="role-tenant-options-error">
+          <el-alert type="error" :closable="false" show-icon :title="tenantOptionsError.message" />
+          <p v-if="tenantOptionsError.requestId" class="request-id">
+            请求编号：{{ tenantOptionsError.requestId }}
+          </p>
+          <el-button text type="primary" @click="tenantOptionsQuery.refetch()">重试</el-button>
+        </div>
       </el-form-item>
 
       <el-form-item class="management-filter-actions">
@@ -667,9 +694,10 @@ async function submitPermissions(): Promise<void> {
               placeholder="请选择所属租户"
               data-test="role-create-tenant"
               :loading="tenantOptionsQuery.isPending.value"
+              :disabled="tenantOptionsError !== null"
             >
               <el-option
-                v-for="tenantOption in tenants"
+                v-for="tenantOption in activeTenants"
                 :key="tenantOption.id"
                 :label="tenantOption.name"
                 :value="tenantOption.id"
@@ -902,6 +930,16 @@ async function submitPermissions(): Promise<void> {
 
 .role-form :deep(.el-select),
 .role-form :deep(.el-textarea) {
+  width: 100%;
+}
+
+.option-error {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.management-filter-error {
   width: 100%;
 }
 

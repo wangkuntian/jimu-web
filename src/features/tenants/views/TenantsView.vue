@@ -61,6 +61,22 @@ const plansQuery = useQuery({
 })
 
 const plans = computed<Plan[]>(() => plansQuery.data.value ?? [])
+const plansError = computed(() =>
+  plansQuery.isError.value ? describeError(plansQuery.error.value) : null,
+)
+const plansUnavailable = computed(
+  () => canListPlans.value && (plansQuery.isFetching.value || plansQuery.isError.value),
+)
+const canSubmitPlan = computed(() => !plansUnavailable.value)
+const plansPlaceholder = computed(() => {
+  if (plansError.value !== null) {
+    return '套餐加载失败，请重试'
+  }
+  if (!canListPlans.value) {
+    return '选择套餐'
+  }
+  return '套餐加载中'
+})
 const items = computed<Tenant[]>(() => tenantsQuery.data.value?.items ?? [])
 const total = computed(() => tenantsQuery.data.value?.total ?? 0)
 
@@ -163,8 +179,11 @@ function withRequestId(message: string, requestId: string): string {
   return requestId === '' ? message : `${message}（请求编号：${requestId}）`
 }
 
-function invalidateList(): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: ['tenants'] })
+async function invalidateList(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['tenants'] }),
+    queryClient.invalidateQueries({ queryKey: ['users'] }),
+  ])
 }
 
 const createVisible = ref(false)
@@ -211,6 +230,7 @@ const editForm = reactive<{ id: string; name: string; status: 0 | 1 }>({
   name: '',
   status: 1,
 })
+const editInitialStatus = ref<0 | 1>(1)
 const editError = ref('')
 const editRequestId = ref('')
 
@@ -226,12 +246,28 @@ function openEdit(row: Tenant): void {
   editForm.id = row.id
   editForm.name = row.name
   editForm.status = row.status === 1 ? 1 : 0
+  editInitialStatus.value = editForm.status
   editError.value = ''
   editRequestId.value = ''
   editVisible.value = true
 }
 
 async function submitEdit(): Promise<void> {
+  if (editInitialStatus.value === 1 && editForm.status === 0) {
+    try {
+      await ElMessageBox.confirm(
+        '停用后该租户将无法登录或发起新的受保护请求，租户数据仍会保留。确认停用？',
+        '停用租户',
+        {
+          type: 'warning',
+          confirmButtonText: '停用',
+          cancelButtonText: '取消',
+        },
+      )
+    } catch {
+      return
+    }
+  }
   editError.value = ''
   editRequestId.value = ''
 
@@ -491,7 +527,7 @@ async function onDelete(row: Tenant): Promise<void> {
             <el-input v-model="editForm.name" />
           </el-form-item>
           <el-form-item label="状态">
-            <el-select v-model="editForm.status">
+            <el-select v-model="editForm.status" data-test="tenant-edit-status">
               <el-option label="启用" :value="1" />
               <el-option label="停用" :value="0" />
             </el-select>
@@ -504,6 +540,7 @@ async function onDelete(row: Tenant): Promise<void> {
             type="primary"
             :loading="updating"
             :disabled="!canSubmitEdit"
+            data-test="tenant-edit-submit"
             @click="submitEdit"
           >
             保存
@@ -514,19 +551,58 @@ async function onDelete(row: Tenant): Promise<void> {
       <el-dialog v-model="planVisible" title="分配套餐" width="480px">
         <el-alert v-if="planError" type="error" :closable="false" show-icon :title="planError" />
         <p v-if="planRequestId" class="request-id">请求编号：{{ planRequestId }}</p>
+        <div v-if="plansError" class="option-error" data-test="tenant-plans-error">
+          <el-alert type="error" :closable="false" show-icon :title="plansError.message" />
+          <p v-if="plansError.requestId" class="request-id">请求编号：{{ plansError.requestId }}</p>
+          <el-button text type="primary" @click="plansQuery.refetch()">重试</el-button>
+        </div>
+        <el-alert
+          v-else-if="!canListPlans"
+          type="warning"
+          :closable="false"
+          show-icon
+          title="无法读取套餐目录；仍可取消当前套餐"
+          data-test="tenant-plans-permission"
+        />
 
         <el-form class="tenant-form" label-position="top">
           <el-form-item :label="`租户 ${planForm.code} 的套餐`">
-            <el-select v-model="planForm.planId" aria-label="套餐">
+            <el-select
+              v-model="planForm.planId"
+              aria-label="套餐"
+              data-test="tenant-plan-select"
+              :disabled="plansUnavailable"
+              :placeholder="plansPlaceholder"
+            >
               <el-option label="取消套餐（不限）" :value="0" />
-              <el-option v-for="plan in plans" :key="plan.id" :label="plan.name" :value="plan.id" />
+              <el-option
+                v-if="!plansQuery.isSuccess.value && planForm.planId !== 0"
+                :label="`当前套餐 #${planForm.planId}`"
+                :value="planForm.planId"
+              />
+              <template v-if="plansQuery.isSuccess.value">
+                <el-option
+                  v-for="plan in plans"
+                  :key="plan.id"
+                  :label="plan.name"
+                  :value="plan.id"
+                />
+              </template>
             </el-select>
           </el-form-item>
         </el-form>
 
         <template #footer>
           <el-button @click="planVisible = false">取消</el-button>
-          <el-button type="primary" :loading="assigning" @click="submitPlan">保存</el-button>
+          <el-button
+            type="primary"
+            :loading="assigning"
+            :disabled="!canSubmitPlan"
+            data-test="tenant-plan-submit"
+            @click="submitPlan"
+          >
+            保存
+          </el-button>
         </template>
       </el-dialog>
     </template>

@@ -83,6 +83,70 @@ test('signs in and lists real tenants for a platform admin', async ({ page }) =>
   await expect(page.getByTestId('tenants-table')).toContainText('专业版')
 })
 
+test('shows plan loading failures and enables saving only after a successful retry', async ({
+  page,
+}) => {
+  let planRequests = 0
+  await page.route(/\/api\/v1\/tenants(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [tenant],
+        total: 1,
+        page: 1,
+        page_size: 20,
+      }),
+    }),
+  )
+  await page.route(/\/api\/v1\/tenant-plans(\?.*)?$/, (route) => {
+    planRequests += 1
+    if (planRequests === 1) {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 1005,
+          message: '套餐加载失败',
+          request_id: 'req-plan-e2e',
+        }),
+      })
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 2, code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
+        ],
+        total: 1,
+        page: 1,
+        page_size: 100,
+      }),
+    })
+  })
+
+  await seedSession(page, ADMIN_IDENTITY)
+  await page.goto('/admin/tenants')
+  await expect(page.getByTestId('tenants-table')).toContainText('默认租户')
+  await page.getByRole('button', { name: '分配套餐' }).click()
+
+  const dialog = page.locator('.el-dialog').filter({ hasText: '分配套餐' })
+  await expect(page.getByTestId('tenant-plans-error')).toContainText('套餐加载失败')
+  await expect(page.getByTestId('tenant-plans-error')).toContainText('req-plan-e2e')
+  await expect(page.getByTestId('tenant-plan-submit')).toBeDisabled()
+
+  await page.getByTestId('tenant-plans-error').getByRole('button', { name: '重试' }).click()
+  await expect(page.getByTestId('tenant-plans-error')).toHaveCount(0)
+  await expect(page.getByTestId('tenant-plan-submit')).toBeEnabled()
+  await dialog.locator('.el-select__wrapper').click()
+  await expect(page.getByRole('option', { name: '专业版', exact: true })).toBeVisible()
+})
+
 test('renders the no-permission page for a user manager without tenant access', async ({
   page,
 }) => {

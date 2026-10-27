@@ -149,7 +149,7 @@ function mountView(
             '<section v-if="modelValue"><h2>{{ title }}</h2><slot /><slot name="footer" /></section>',
         },
         ElSelect: {
-          props: ['modelValue', 'loading', 'multiple'],
+          props: ['modelValue', 'loading', 'multiple', 'disabled'],
           emits: ['update:modelValue', 'change'],
           template: '<div class="el-select-stub"><slot /></div>',
         },
@@ -485,6 +485,33 @@ describe('UsersView', () => {
     expect(wrapper.find('[data-test="user-role-submit"]').attributes('disabled')).toBeUndefined()
   })
 
+  it('uses active-only tenants for creation while keeping all tenants for filtering', async () => {
+    const disabledTenant = {
+      ...tenant,
+      id: 'tenant-disabled',
+      code: 'disabled',
+      name: '已停用租户',
+      status: 0,
+    }
+    listTenantOptionsMock.mockResolvedValue([tenant, disabledTenant])
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    await vi.waitFor(() => expect(listTenantOptionsMock).toHaveBeenCalledTimes(1))
+    expect(listTenantOptionsMock.mock.calls[0]).toEqual([])
+
+    const filter = wrapper.findComponent('[data-test="user-tenant-filter"]')
+    expect(filter.text()).toContain('Acme')
+    expect(filter.text()).toContain('已停用租户')
+
+    await wrapper.find('[data-test="user-create"]').trigger('click')
+    const createTenant = wrapper.findComponent('[data-test="user-create-tenant"]')
+    expect(createTenant.text()).toContain('Acme')
+    expect(createTenant.text()).not.toContain('已停用租户')
+  })
+
   it('reuses the shared tenant and role query keys for cross-page invalidation', async () => {
     saveIdentity(fullAdminIdentity)
     listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
@@ -518,7 +545,6 @@ describe('UsersView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
-    await wrapper.find('[data-test="user-create"]').trigger('click')
     const error = await vi.waitFor(() => {
       const node = wrapper.find('[data-test="user-tenant-options-error"]')
       expect(node.exists()).toBe(true)
@@ -527,11 +553,15 @@ describe('UsersView', () => {
     expect(error.text()).toContain('租户选项加载失败')
     expect(error.text()).toContain('req-tenant-options')
 
+    await wrapper.find('[data-test="user-create"]').trigger('click')
+    const tenantSelect = wrapper.findComponent('[data-test="user-create-tenant"]') as VueWrapper
+    expect((tenantSelect.props() as { disabled?: boolean }).disabled).toBe(true)
+
     await error.find('button').trigger('click')
     await vi.waitFor(() =>
       expect(wrapper.find('[data-test="user-tenant-options-error"]').exists()).toBe(false),
     )
-    expect(listTenantOptionsMock).toHaveBeenCalledTimes(2)
+    expect((tenantSelect.props() as { disabled?: boolean }).disabled).toBe(false)
   })
 
   it('disables create until failed role options are retried', async () => {
