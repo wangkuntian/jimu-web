@@ -17,22 +17,22 @@ describe('session expiry navigation', () => {
 
   it('returns to the login page carrying the current path when the session expires', async () => {
     saveSession({ access_token: 'a1', refresh_token: 'r1', expires_in: 1800 })
-    await router.push('/portal')
+    await router.push('/hub')
 
     expireSession()
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe(LOGIN_ROUTE)
-    expect(router.currentRoute.value.query.redirect).toBe('/portal')
+    expect(router.currentRoute.value.query.redirect).toBe('/hub')
   })
 
   it('does not navigate on a plain logout', async () => {
     saveSession({ access_token: 'a1', refresh_token: 'r1', expires_in: 1800 })
-    await router.push('/portal')
+    await router.push('/hub')
 
     clearSession()
     await flushPromises()
 
-    expect(router.currentRoute.value.fullPath).toBe('/portal')
+    expect(router.currentRoute.value.fullPath).toBe('/hub')
   })
 })

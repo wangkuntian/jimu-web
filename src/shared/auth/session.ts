@@ -1,4 +1,6 @@
-import type { TokenPair } from '../api/types'
+import { shallowRef } from 'vue'
+
+import type { Identity, TokenPair } from '../api/types'
 
 const REFRESH_TOKEN_KEY = 'jimu.refresh_token'
 const DEVICE_TOKEN_KEY = 'jimu.device_token'
@@ -7,6 +9,49 @@ const DEVICE_TOKEN_KEY = 'jimu.device_token'
 let accessToken: string | null = null
 /** 访问令牌的绝对到期时间（毫秒时间戳）。 */
 let expiresAt = 0
+/** 当前会话身份；内存驻留，不落盘、不进 Pinia。用 ref 让导航项能随引导完成重算。 */
+const identity = shallowRef<Identity | null>(null)
+
+/** 身份的加载状态；`'unknown'` 表示尚未加载或已被清理。 */
+export type IdentityStatus = 'ok' | 'unauthenticated' | 'unavailable'
+export type IdentityState = IdentityStatus | 'unknown'
+
+const identityStatus = shallowRef<IdentityState>('unknown')
+
+type SessionClearedHandler = () => void
+const sessionClearedHandlers = new Set<SessionClearedHandler>()
+
+/** 清理会话时同步丢弃与服务端身份绑定的缓存。 */
+export function onSessionCleared(handler: SessionClearedHandler): () => void {
+  sessionClearedHandlers.add(handler)
+  return () => {
+    sessionClearedHandlers.delete(handler)
+  }
+}
+
+export function getIdentityStatus(): IdentityState {
+  return identityStatus.value
+}
+
+/** 只由身份引导流程写入；`saveIdentity` / `clearIdentity` / `clearSession` 会同步维护。 */
+export function setIdentityStatus(value: IdentityState): void {
+  identityStatus.value = value
+}
+
+export function getIdentity(): Identity | null {
+  return identity.value
+}
+
+export function saveIdentity(value: Identity): void {
+  identity.value = value
+  identityStatus.value = 'ok'
+}
+
+export function clearIdentity(): void {
+  identity.value = null
+  // 清空身份意味着「还没加载」而不是「已加载且无权限」，不能残留 'ok'。
+  identityStatus.value = 'unknown'
+}
 
 export function getAccessToken(): string | null {
   return accessToken
@@ -50,7 +95,12 @@ export function saveSession(tokens: TokenPair): void {
 export function clearSession(): void {
   accessToken = null
   expiresAt = 0
+  identity.value = null
+  identityStatus.value = 'unknown'
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+  for (const handler of sessionClearedHandlers) {
+    handler()
+  }
 }
 
 type SessionExpiredHandler = () => void

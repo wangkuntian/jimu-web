@@ -3,13 +3,14 @@ import ElementPlus from 'element-plus'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { fetchCaptcha, login } from '../../src/features/auth/api'
+import { fetchAuthConfig, fetchCaptcha, login } from '../../src/features/auth/api'
 import LoginView from '../../src/features/auth/views/LoginView.vue'
 import { ApiError, ErrorCode } from '../../src/shared/api/unwrap'
 
-// LoginView 只通过 '../api' 消费这两个函数；真实请求与会话存储与本文件无关，
+// LoginView 只通过 '../api' 消费这三个函数；真实请求与会话存储与本文件无关，
 // 打桩后才能驱动「后端要求验证码、验证码接口却失败」这条路径。
 vi.mock('../../src/features/auth/api', () => ({
+  fetchAuthConfig: vi.fn(),
   fetchCaptcha: vi.fn(),
   login: vi.fn(),
 }))
@@ -48,6 +49,10 @@ function mountLogin(onError?: (error: unknown) => void) {
 describe('LoginView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(fetchAuthConfig).mockResolvedValue({
+      public_registration: false,
+      provisioning_enabled: false,
+    })
   })
 
   it('renders visible labels, not placeholders', () => {
@@ -56,6 +61,19 @@ describe('LoginView', () => {
     expect(wrapper.text()).toContain('用户名')
     expect(wrapper.text()).toContain('密码')
     expect(wrapper.text()).toContain('记住此设备')
+  })
+
+  it('presents a structured access entry with the form as the primary landmark', () => {
+    const wrapper = mountLogin()
+
+    expect(wrapper.find('header.auth-masthead').exists()).toBe(true)
+    expect(wrapper.find('main.auth-workspace').exists()).toBe(true)
+    expect(wrapper.find('section.auth-context').exists()).toBe(true)
+    expect(wrapper.findAll('h1')).toHaveLength(1)
+    expect(wrapper.find('h1').text()).toBe('欢迎回来')
+    expect(wrapper.find('.brand-mark').exists()).toBe(true)
+    expect(wrapper.find('.brand-name').text()).toBe('Jimu Hub')
+    expect(wrapper.find('ol').exists()).toBe(false)
   })
 
   it('hides the totp and captcha fields by default', () => {
@@ -92,7 +110,7 @@ describe('LoginView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('验证码错误，请重新输入')
-    expect(wrapper.find('.captcha-image').attributes('src')).toBe('data:image/png;base64,AA')
+    expect(wrapper.find('.auth-captcha-image').attributes('src')).toBe('data:image/png;base64,AA')
     expect(errors).toHaveLength(0)
   })
 
@@ -141,7 +159,7 @@ describe('LoginView', () => {
     expect(wrapper.find('[data-test="totp"]').exists()).toBe(true)
   })
 
-  it('ignores an off-site redirect target and falls back to the portal', async () => {
+  it('ignores an off-site redirect target and falls back to the hub', async () => {
     const router = createTestRouter()
     await router.push({ path: '/login', query: { redirect: '//evil.example' } })
     await router.isReady()
@@ -162,6 +180,38 @@ describe('LoginView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(router.currentRoute.value.path).toBe('/portal')
+    expect(router.currentRoute.value.path).toBe('/hub')
+  })
+
+  it('hides the register entry when public registration is closed', async () => {
+    vi.mocked(fetchAuthConfig).mockResolvedValue({
+      public_registration: false,
+      provisioning_enabled: false,
+    })
+    const wrapper = mountLogin()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="register-link"]').exists()).toBe(false)
+  })
+
+  it('shows the register entry and the success notice when the backend allows it', async () => {
+    vi.mocked(fetchAuthConfig).mockResolvedValue({
+      public_registration: true,
+      provisioning_enabled: false,
+    })
+    const router = createTestRouter()
+    await router.push({ path: '/login', query: { registered: '1' } })
+    await router.isReady()
+
+    const wrapper = mount(LoginView, {
+      global: {
+        plugins: [ElementPlus, router],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="register-link"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('注册成功')
   })
 })

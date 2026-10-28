@@ -4,7 +4,7 @@ name: Release
 # 候选 PR 的常规门禁由 ci.yml 的 CI Gate 承担，这里只校验 tag 与当前 master tip 一致，
 # 避免绕过 PR 直接给旧提交或分支提交打 tag。
 #
-# 发布物：dist/ 的静态资源包 jimu-portal-<tag>.tar.gz（解压后作为站点根目录部署）。
+# 发布物：dist/ 的静态资源包 jimu-hub-<tag>.tar.gz（解压后作为站点根目录部署）。
 on:
   push:
     tags:
@@ -68,7 +68,7 @@ jobs:
       - name: '📦 Package the static assets'
         run: |
           set -euo pipefail
-          bundle="jimu-portal-${GITHUB_REF_NAME}.tar.gz"
+          bundle="jimu-hub-${GITHUB_REF_NAME}.tar.gz"
           tar -czf "$bundle" -C dist .
           ls -l "$bundle"
 
@@ -76,7 +76,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-bundle
-          path: jimu-portal-*.tar.gz
+          path: jimu-hub-*.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -119,6 +119,6 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           body: ${{ steps.notes.outputs.body }}
-          files: dist/jimu-portal-*.tar.gz
+          files: dist/jimu-hub-*.tar.gz
           draft: false
           prerelease: false

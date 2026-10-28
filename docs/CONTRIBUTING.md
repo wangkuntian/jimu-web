@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你愿意为 Jimu Portal 贡献力量。本文档是开发流程的事实依据；协作规范（给 AI agent 的约束）见 [AGENTS.md](../AGENTS.md)，项目结构与 CLI 见 [README.md](../README.md)。
+感谢你愿意为 Jimu Hub 贡献力量。本文档是开发流程的事实依据；协作规范（给 AI agent 的约束）见 [AGENTS.md](../AGENTS.md)，项目结构与 CLI 见 [README.md](../README.md)。
 
 ## 开发环境
 
@@ -15,6 +15,16 @@ pnpm run hooks:install   # git config core.hooksPath githooks，启用 commit-ms
 pnpm run api:types       # 从固定契约生成 API 类型
 pnpm run dev             # http://localhost:5173，/api 代理到本地后端
 ```
+
+## 跨仓协作
+
+与后端 `jimu` 的纵向需求按 [jimu 跨仓协作工作流](https://github.com/wangkuntian/jimu/blob/master/docs/design/cross-repo-development.md)执行：
+
+- 后端 API、权限和错误码以 `jimu` 为准，前端不复制或猜测领域规则。
+- 契约冻结是唯一串行点；前端等待可获取的 `contract-sha`，不等待后端业务实现完成。
+- 后端契约形成可获取的提交后，运行 `scripts/sync-contract.sh <contract-sha>` 固定契约并生成类型。
+- 前端只修改页面、交互和 API 消费逻辑；`src/shared/api/generated.ts` 保持派生文件身份。
+- 跨仓任务使用该工作流中的任务模板，并分别汇报两端验证结果。
 
 ## 分支策略
 
@@ -78,15 +88,15 @@ bash scripts/check_commit_messages.sh origin/master HEAD
 
 `.github/workflows/ci.yml` 是唯一的质量管线：一个 `Changes` router 判断这次改动是不是纯文档，各领域 job 用 **job 级 `if`** 消费它的输出，最后由 `CI Gate` 收口。
 
-| Job                            | 何时运行              | 内容                                                                          |
-| ------------------------------ | --------------------- | ----------------------------------------------------------------------------- |
-| `Changes`                      | 始终                  | diff 分析，产出 `code`（是否非纯文档改动）                                    |
-| `Policy`                       | 始终（检查内容仅 PR） | commit message 规范、版本日志同步                                             |
-| `Quality & Tests (node 22/24)` | `code=true`           | `fmt:check`、`lint`、`typecheck`、`test`，矩阵覆盖 `engines` 声明的 Node 区间 |
-| `API Contract`                 | `code=true`           | `api:check`：重新生成契约派生文件并确认无差异                                 |
-| `Build`                        | `code=true`           | `build`，产物上传为 `dist` artifact                                           |
-| `E2E (Playwright)`             | `code=true`           | chromium 端到端，失败时上传 report 与 trace                                   |
-| `CI Gate`                      | 始终                  | 聚合判定，见下                                                                |
+| Job                            | 何时运行              | 内容                                                                                                       |
+| ------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Changes`                      | 始终                  | diff 分析，产出 `code`（是否非纯文档改动）                                                                 |
+| `Policy`                       | 始终（检查内容仅 PR） | commit message 规范、版本日志同步                                                                          |
+| `Quality & Tests (node 22/24)` | `code=true`           | `fmt:check`、`lint`、`typecheck`、`test`，矩阵覆盖 `engines` 声明的 Node 区间                              |
+| `API Contract`                 | `code=true`           | `api:check`：重新生成契约派生文件并确认无差异；`scripts/check_contract_pin.sh`：公开仓取证、逐字节比对 pin |
+| `Build`                        | `code=true`           | `build`，产物上传为 `dist` artifact                                                                        |
+| `E2E (Playwright)`             | `code=true`           | chromium 端到端，失败时上传 report 与 trace                                                                |
+| `CI Gate`                      | 始终                  | 聚合判定，见下                                                                                             |
 
 约定：
 
@@ -106,7 +116,7 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 
 - 发布在 `master` tip 打 `vMAJOR.MINOR.PATCH` tag（SemVer，无预发布标签）
 - 若本版本走了 `release/<version>` 集成分支，顺序是：该分支合入 `master` → 确认 `master` tip 通过 `CI Gate` → 在 `master` tip 打 tag；**不在集成分支上打 tag**
-- `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`pnpm run build`、打包 `jimu-portal-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
+- `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`pnpm run build`、打包 `jimu-hub-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
 - 发布产物是静态资源包，解压后的内容即站点根目录，由 Nginx/CDN 等静态托管
 - 回滚：`master` 不允许强推，用 revert commit 走正常 PR；已发布的 tag 不重打，改版本号重新发布
 
@@ -163,7 +173,7 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 - 不在前端复制后端领域规则（错误码分段、归属模型、套餐与配额上限）；需要时查 `jimu` 仓库文档
 - 不传租户标识（header、query、请求体都不传），租户范围与权限判定以服务端返回为准
 - `src/shared/api/generated.ts` 是 `pnpm run api:types` 的派生产物，只读，不手写业务逻辑
-- 契约变更流程：替换 `contracts/jimu.swagger.yaml` → 更新 `contracts/backend-commit.txt` → 运行 `pnpm run api:types` → 提交派生文件
+- 契约变更流程：运行 `scripts/sync-contract.sh [<ref>]`（写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，并重新生成类型）→ 提交派生文件；CI 用 `scripts/check_contract_pin.sh` 去公开仓取证并逐字节校验 pin
 - 修改脚本、工具或目录约定后，同步更新 [README.md](../README.md)
 
 提交前至少运行：

@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/v1/admin/error-codes": {
+    "/admin/error-codes": {
         parameters: {
             query?: never;
             header?: never;
@@ -33,6 +33,15 @@ export interface paths {
                         "application/json": components["schemas"]["response.Body"];
                     };
                 };
+                /** @description 未认证 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["response.Body"];
+                    };
+                };
             };
         };
         put?: never;
@@ -43,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/ratelimit/auth": {
+    "/admin/ratelimit/auth": {
         parameters: {
             query?: never;
             header?: never;
@@ -79,6 +88,15 @@ export interface paths {
                 };
                 /** @description Bad Request */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "*/*": components["schemas"]["response.Body"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -140,7 +158,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.AuditLogPageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段） */
@@ -200,7 +218,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.AuditLogBodyResponse"];
                     };
                 };
                 /** @description 参数错误（ID 格式无效） */
@@ -349,6 +367,45 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取认证能力开关
+         * @description 返回客户端渲染登录/注册入口所需的公开开关。无论是否开放公开注册，本端点都存在。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回注册相关开关 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["interfaces.AuthConfigResponse"];
                     };
                 };
             };
@@ -596,7 +653,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["contract.TokenPair"];
                     };
                 };
                 /** @description 参数错误（用户名或密码格式不符） */
@@ -786,6 +843,63 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取当前会话身份与权限点
+         * @description 返回当前用户的身份、角色与有效权限点（resource + action，与 Casbin 策略同形，resource 支持通配）。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回身份与权限点 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["application.MeView"];
+                    };
+                };
+                /** @description 未认证 */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 用户不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -997,7 +1111,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["contract.TokenPair"];
                     };
                 };
                 /** @description 参数错误 */
@@ -1038,7 +1152,7 @@ export interface paths {
         /**
          * 用户注册
          * @description 注册新用户账户。仅当系统配置中 public_registration 为 true 时可用。支持 IP 维度的限流保护。
-         *     开通式注册（auth.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
+         *     开通式注册（tenant.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
          *     普通注册（未启用开通式）时忽略租户字段，用户归默认租户，返回用户信息。
          *     开通式注册的 tenant_code 统一转小写存储，不传则自动生成；未传 tenant_name 报参数错误。
          */
@@ -1062,7 +1176,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.RegisterResponse"];
                     };
                 };
                 /** @description 参数错误（如用户名已存在、租户编码格式无效或已存在） */
@@ -1715,11 +1829,20 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.PermissionPageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问 */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1818,7 +1941,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 权限 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -1872,7 +1995,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 权限 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -1941,7 +2064,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 权限 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2001,6 +2124,12 @@ export interface paths {
                     sort?: string;
                     /** @description 排序方向（asc 或 desc，默认 desc） */
                     order?: string;
+                    /** @description 目标租户 ID；省略时跨租户查询 */
+                    tenant_id?: string;
+                    /** @description 角色名称模糊匹配 */
+                    keyword?: string;
+                    /** @description 状态（0=停用 1=启用） */
+                    status?: number;
                 };
                 header?: never;
                 path?: never;
@@ -2014,11 +2143,20 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.RolePageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问 */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2040,7 +2178,7 @@ export interface paths {
         put?: never;
         /**
          * 创建角色
-         * @description 创建新角色。角色名称必须唯一，用于权限管理和访问控制。
+         * @description 创建新角色。平台管理员必须传 tenant_id；首版角色接口仅平台管理员可用。租户内角色名唯一。
          */
         post: {
             parameters: {
@@ -2049,7 +2187,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description 角色信息（名称和描述） */
+            /** @description 角色信息（租户、名称和描述） */
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["application.CreateRoleRequest"];
@@ -2062,11 +2200,29 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.RoleBodyResponse"];
                     };
                 };
                 /** @description 参数错误（如名称为空） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 租户不存在 */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2109,7 +2265,7 @@ export interface paths {
         };
         /**
          * 获取角色详情
-         * @description 根据角色 ID 获取角色详细信息，包括关联的权限列表。
+         * @description 根据角色 ID 获取角色详细信息。权限列表由 GET /roles/{id}/permissions 单独读取。
          */
         get: {
             parameters: {
@@ -2117,7 +2273,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 角色 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2129,11 +2285,20 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.RoleBodyResponse"];
                     };
                 };
                 /** @description 参数错误（ID 格式无效） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问 */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2163,7 +2328,7 @@ export interface paths {
         };
         /**
          * 更新角色信息
-         * @description 更新指定角色的名称或描述。
+         * @description 更新指定角色的名称、描述或状态。tenant_id 不可修改。
          */
         put: {
             parameters: {
@@ -2171,7 +2336,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 角色 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2193,6 +2358,15 @@ export interface paths {
                 };
                 /** @description 参数错误（ID 格式无效） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问 */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2232,7 +2406,7 @@ export interface paths {
         post?: never;
         /**
          * 删除角色
-         * @description 软删除指定角色。删除后角色数据仍保留在数据库中，但无法分配给用户。
+         * @description 永久删除未分配给用户的自定义角色，同时清理其权限关联。系统角色返回 403；角色已分配给用户时返回 409。停用角色请使用更新接口并将 status 设为 0。
          */
         delete: {
             parameters: {
@@ -2240,7 +2414,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 角色 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2255,6 +2429,33 @@ export interface paths {
                 };
                 /** @description 参数错误（ID 格式无效） */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问或系统角色不可删除 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 角色不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 角色已分配给用户 */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2285,11 +2486,73 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * 获取角色当前权限
+         * @description 返回指定角色当前已分配的权限。没有权限时返回空数组。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description 角色 ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回角色权限 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["application.PermissionListResponse"];
+                    };
+                };
+                /** @description 参数错误（ID 格式无效） */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 仅平台管理员可访问 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 角色不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 服务器内部错误 */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         /**
          * 分配角色权限
-         * @description 为指定角色分配权限。传入权限 ID 数组，角色将被赋予这些权限。原有权限会被替换。
+         * @description 整体替换角色权限。权限 ID 使用字符串；空数组表示清空该角色权限。
          */
         post: {
             parameters: {
@@ -2297,7 +2560,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 角色 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2326,6 +2589,24 @@ export interface paths {
                         "application/json": components["schemas"]["contract.ErrorResponse"];
                     };
                 };
+                /** @description 仅平台管理员可访问或无权授予指定权限 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 角色不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
                 /** @description 服务器内部错误 */
                 500: {
                     headers: {
@@ -2337,6 +2618,75 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取可分配角色选项
+         * @description 返回指定租户内启用且可分配给用户的角色摘要。平台管理员查看默认租户时同时返回平台角色；租户身份只能读取当前租户。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description 目标租户 ID（平台管理员可选） */
+                    tenant_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 成功，返回角色选项 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["application.RoleOptionListResponse"];
+                    };
+                };
+                /** @description 参数错误（tenant_id 格式无效） */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 跨租户访问 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 服务器内部错误 */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2374,7 +2724,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.PlanPageResponse"];
                     };
                 };
                 /** @description 参数错误 */
@@ -2460,7 +2810,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 套餐 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2511,7 +2861,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 套餐 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2573,6 +2923,10 @@ export interface paths {
                     sort?: string;
                     /** @description 排序方向（asc 或 desc，默认 desc） */
                     order?: string;
+                    /** @description 编码或名称模糊匹配 */
+                    keyword?: string;
+                    /** @description 状态（0=停用 1=启用） */
+                    status?: number;
                 };
                 header?: never;
                 path?: never;
@@ -2586,7 +2940,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.TenantPageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段） */
@@ -2634,7 +2988,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.TenantBodyResponse"];
                     };
                 };
                 /** @description 参数错误（编码格式无效） */
@@ -2689,7 +3043,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 租户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2701,7 +3055,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.TenantBodyResponse"];
                     };
                 };
                 /** @description 参数错误（ID 格式无效） */
@@ -2743,7 +3097,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 租户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2803,7 +3157,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 租户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2871,7 +3225,7 @@ export interface paths {
         get?: never;
         /**
          * 为租户分配套餐
-         * @description 为指定租户分配套餐；plan_id=0 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
+         * @description 为指定租户分配套餐；plan_id="0" 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
          */
         put: {
             parameters: {
@@ -2879,7 +3233,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 租户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2983,7 +3337,7 @@ export interface paths {
         };
         /**
          * 获取用户列表
-         * @description 分页获取用户列表。支持按 ID、用户名、创建时间排序，可指定升序或降序。
+         * @description 分页获取用户列表。平台管理员可跨租户查询；租户管理员只能看到本租户，范围由后端身份决定。
          */
         get: {
             parameters: {
@@ -2996,6 +3350,12 @@ export interface paths {
                     sort?: string;
                     /** @description 排序方向（asc 或 desc，默认 desc） */
                     order?: string;
+                    /** @description 用户名子串 */
+                    username?: string;
+                    /** @description 状态（0 停用 / 1 启用） */
+                    status?: number;
+                    /** @description 所属租户 ID（平台级视角可筛选） */
+                    tenant_id?: string;
                 };
                 header?: never;
                 path?: never;
@@ -3009,7 +3369,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["contract.PageResponse"];
+                        "application/json": components["schemas"]["application.UserPageResponse"];
                     };
                 };
                 /** @description 参数错误（如无效的排序字段或排序方向） */
@@ -3035,7 +3395,7 @@ export interface paths {
         put?: never;
         /**
          * 创建用户
-         * @description 创建新用户账户。用户名必须唯一，密码需符合强度要求（8-32位，包含字母和数字）。支持幂等性保护（通过 Idempotency-Key 请求头）。
+         * @description 创建新用户账户。平台管理员必须指定 tenant_id 并可同时分配 role_ids；租户管理员由后端强制使用当前租户。
          */
         post: {
             parameters: {
@@ -3044,7 +3404,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description 用户信息（用户名和密码） */
+            /** @description 用户信息、所属租户与角色 */
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["application.CreateUserRequest"];
@@ -3057,7 +3417,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.UserBodyResponse"];
                     };
                 };
                 /** @description 参数错误（如用户名格式不符、密码强度不足） */
@@ -3112,7 +3472,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 用户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -3124,7 +3484,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["response.Body"];
+                        "application/json": components["schemas"]["application.UserBodyResponse"];
                     };
                 };
                 /** @description 参数错误（ID 格式无效） */
@@ -3166,7 +3526,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 用户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -3218,7 +3578,7 @@ export interface paths {
         post?: never;
         /**
          * 删除用户
-         * @description 软删除指定用户。删除后用户数据仍保留在数据库中，但无法登录系统。
+         * @description 删除指定用户（软删除，账号从常规查询中消失）。最后一个有效平台超级管理员返回 409；如需保留账号并禁止登录，请使用更新接口将 status 设为 0。
          */
         delete: {
             parameters: {
@@ -3226,7 +3586,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 用户 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -3248,6 +3608,24 @@ export interface paths {
                         "application/json": components["schemas"]["contract.ErrorResponse"];
                     };
                 };
+                /** @description 用户不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 不能删除最后一个有效平台超级管理员 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
                 /** @description 服务器内部错误 */
                 500: {
                     headers: {
@@ -3259,6 +3637,71 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 分配用户角色
+         * @description 替换指定用户的全部角色（按角色 ID）。角色必须属于用户所属租户，不存在返回 404。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description 用户 ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description 角色 ID 列表 */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["application.AssignUserRolesRequest"];
+                };
+            };
+            responses: {
+                /** @description 成功 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["response.Body"];
+                    };
+                };
+                /** @description 参数错误 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+                /** @description 用户或角色不存在 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["contract.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3375,10 +3818,42 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         "application.AssignPermissionsRequest": {
-            permission_ids: number[];
+            permission_ids: string[];
         };
         "application.AssignPlanRequest": {
-            plan_id?: number;
+            plan_id?: string;
+        };
+        "application.AssignUserRolesRequest": {
+            role_ids?: string[];
+        };
+        "application.AuditLogBodyResponse": {
+            code?: number;
+            data?: components["schemas"]["application.AuditLogResponse"];
+            message?: string;
+            request_id?: string;
+        };
+        "application.AuditLogPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.AuditLogResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.AuditLogResponse": {
+            action?: string;
+            created_at?: string;
+            detail?: string;
+            id?: number;
+            ip?: string;
+            method?: string;
+            path?: string;
+            resource?: string;
+            status?: number;
+            tenant_id?: string;
+            user_id?: number;
+            username?: string;
         };
         "application.BatchDeleteRequest": {
             ids: number[];
@@ -3401,6 +3876,7 @@ export interface components {
         "application.CreateRoleRequest": {
             description?: string;
             name: string;
+            tenant_id?: string;
         };
         "application.CreateTenantRequest": {
             code: string;
@@ -3410,7 +3886,156 @@ export interface components {
             email?: string;
             password: string;
             phone?: string;
+            role_ids?: string[];
+            tenant_id?: string;
             username: string;
+        };
+        "application.MeUser": {
+            created_at?: string;
+            id?: number;
+            status?: number;
+            tenant_id?: number;
+            username?: string;
+        };
+        "application.MeView": {
+            permissions?: components["schemas"]["application.PermissionPoint"][];
+            roles?: string[];
+            user?: components["schemas"]["application.MeUser"];
+        };
+        "application.PermissionListResponse": {
+            code?: number;
+            data?: components["schemas"]["application.PermissionResponse"][];
+            message?: string;
+            request_id?: string;
+        };
+        "application.PermissionPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.PermissionResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.PermissionPoint": {
+            action?: string;
+            resource?: string;
+        };
+        "application.PermissionResponse": {
+            action?: string;
+            created_at?: string;
+            id?: string;
+            name?: string;
+            resource?: string;
+        };
+        "application.PlanPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.PlanResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.PlanResponse": {
+            code?: string;
+            id?: string;
+            max_api_keys?: number;
+            max_roles?: number;
+            max_users?: number;
+            name?: string;
+        };
+        "application.RegisterResponse": {
+            tenant?: components["schemas"]["application.RegisterTenantView"];
+            user?: components["schemas"]["application.RegisterUserView"];
+        };
+        "application.RegisterTenantView": {
+            code?: string;
+            id?: number;
+            name?: string;
+            status?: number;
+        };
+        "application.RegisterUserView": {
+            created_at?: string;
+            email?: string;
+            id?: number;
+            phone?: string;
+            status?: number;
+            tenant_id?: number;
+            updated_at?: string;
+            username?: string;
+        };
+        "application.RoleBodyResponse": {
+            code?: number;
+            data?: components["schemas"]["application.RoleResponse"];
+            message?: string;
+            request_id?: string;
+        };
+        "application.RoleOptionListResponse": {
+            code?: number;
+            data?: components["schemas"]["application.RoleOptionResponse"][];
+            message?: string;
+            request_id?: string;
+        };
+        "application.RoleOptionResponse": {
+            code?: string;
+            id?: string;
+            is_system?: boolean;
+            name?: string;
+            scope?: components["schemas"]["contract.RoleScope"];
+        };
+        "application.RolePageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.RoleResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.RoleRef": {
+            id?: string;
+            name?: string;
+        };
+        "application.RoleResponse": {
+            code?: string;
+            created_at?: string;
+            description?: string;
+            id?: string;
+            is_system?: boolean;
+            name?: string;
+            scope?: components["schemas"]["contract.RoleScope"];
+            status?: number;
+            tenant_id?: string;
+            updated_at?: string;
+        };
+        "application.TenantBodyResponse": {
+            code?: number;
+            data?: components["schemas"]["application.TenantResponse"];
+            message?: string;
+            request_id?: string;
+        };
+        "application.TenantPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.TenantResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.TenantRef": {
+            id?: string;
+            name?: string;
+        };
+        "application.TenantResponse": {
+            code?: string;
+            created_at?: string;
+            id?: string;
+            name?: string;
+            plan_id?: string;
+            status?: number;
+            updated_at?: string;
         };
         "application.UpdatePermissionRequest": {
             action: string;
@@ -3426,6 +4051,8 @@ export interface components {
         "application.UpdateRoleRequest": {
             description?: string;
             name: string;
+            /** @enum {integer} */
+            status?: 0 | 1;
         };
         "application.UpdateTenantRequest": {
             name?: string;
@@ -3433,8 +4060,36 @@ export interface components {
             status?: 0 | 1;
         };
         "application.UpdateUserRequest": {
+            email?: string;
+            phone?: string;
             /** @enum {integer} */
             status?: 0 | 1;
+        };
+        "application.UserBodyResponse": {
+            code?: number;
+            data?: components["schemas"]["application.UserResponse"];
+            message?: string;
+            request_id?: string;
+        };
+        "application.UserPageResponse": {
+            code?: number;
+            data?: components["schemas"]["application.UserResponse"][];
+            message?: string;
+            page?: number;
+            page_size?: number;
+            request_id?: string;
+            total?: number;
+        };
+        "application.UserResponse": {
+            created_at?: string;
+            email?: string;
+            id?: string;
+            phone?: string;
+            roles?: components["schemas"]["application.RoleRef"][];
+            status?: number;
+            tenant?: components["schemas"]["application.TenantRef"];
+            updated_at?: string;
+            username?: string;
         };
         "application.VerifyResult": {
             /** @description 首个异常条目 ID */
@@ -3467,6 +4122,21 @@ export interface components {
             page_size?: number;
             request_id?: string;
             total?: number;
+        };
+        /** @enum {string} */
+        "contract.RoleScope": "platform" | "tenant";
+        "contract.TokenPair": {
+            access_token?: string;
+            /** @description DeviceToken 仅在「记住此设备」成功签发时返回，客户端需安全保存。 */
+            device_token?: string;
+            expires_in?: number;
+            refresh_token?: string;
+        };
+        "interfaces.AuthConfigResponse": {
+            /** @description ProvisioningEnabled 开通式注册：注册 = 开通新租户，tenant_name 必填 */
+            provisioning_enabled?: boolean;
+            /** @description PublicRegistration 是否开放公开注册（false 时 /auth/register 路由不注册） */
+            public_registration?: boolean;
         };
         "interfaces.disableTOTPRequest": {
             code: string;

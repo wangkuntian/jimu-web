@@ -6,10 +6,12 @@ import {
   expireSession,
   getAccessToken,
   getDeviceToken,
+  getIdentity,
   getRefreshToken,
   hasSession,
   isAccessTokenExpiring,
   onSessionExpired,
+  saveIdentity,
   saveSession,
 } from '../../src/shared/auth/session'
 
@@ -96,5 +98,23 @@ describe('auth session', () => {
     } finally {
       unsubscribe()
     }
+  })
+
+  it('drops the identity together with the session', () => {
+    saveIdentity({
+      user: {
+        id: 1,
+        username: 'admin',
+        status: 1,
+        tenant_id: 1,
+        created_at: '2026-10-19T00:00:00Z',
+      },
+      roles: [],
+      permissions: [],
+    })
+
+    clearSession()
+
+    expect(getIdentity()).toBeNull()
   })
 })

@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchCaptcha, login, logout, logoutAll } from '../../src/features/auth/api'
+import {
+  fetchAuthConfig,
+  fetchCaptcha,
+  login,
+  logout,
+  logoutAll,
+  register,
+} from '../../src/features/auth/api'
 import {
   clearSession,
   getAccessToken,
@@ -114,7 +121,81 @@ describe('auth api', () => {
       vi.fn(async () => jsonResponse({ code: 1006, message: '认证信息无效' })),
     )
 
-    await expect(login({ username: 'alice', password: 'bad' })).rejects.toBeInstanceOf(ApiError)
+    const rejection = login({ username: 'alice', password: 'bad' })
+    await expect(rejection).rejects.toBeInstanceOf(ApiError)
+    await expect(rejection).rejects.toMatchObject({ code: 1006 })
+  })
+
+  it('surfaces the 1006 business code carried by a real 401', async () => {
+    // openapi-fetch 只在 2xx 把响应体写进 data；401 的 {code:1006} 落在 error 里。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ code: 1006, message: '认证信息无效' }, 401)),
+    )
+
+    const rejection = login({ username: 'alice', password: 'bad' })
+    await expect(rejection).rejects.toBeInstanceOf(ApiError)
+    await expect(rejection).rejects.toMatchObject({ code: 1006, message: '认证信息无效' })
+    expect(getAccessToken()).toBeNull()
+  })
+
+  it('surfaces the 4001 business code carried by a real 400', async () => {
+    // 4001（需要图形验证码）走 400，是登录页 needsCaptcha 分支的唯一依据。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ code: 4001, message: '需要图形验证码' }, 400)),
+    )
+
+    await expect(login({ username: 'alice', password: 'secret123' })).rejects.toMatchObject({
+      code: 4001,
+      message: '需要图形验证码',
+    })
+  })
+
+  it('surfaces the 2002 business code carried by a real 409', async () => {
+    // 注册重名（2002）走 409；只读 data 会让注册页的「用户名已存在」分支永远走不到。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ code: 2002, message: '用户名已存在' }, 409)),
+    )
+
+    await expect(register({ username: 'alice', password: 'secret123' })).rejects.toMatchObject({
+      code: 2002,
+      message: '用户名已存在',
+    })
+  })
+
+  it('normalizes the register 429 to the rate-limited business code', async () => {
+    // 注册限流的响应体可能不是标准信封；状态码 429 本身才是唯一可靠信号。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('rate limited', {
+            status: 429,
+            headers: { 'Content-Type': 'text/plain' },
+          }),
+      ),
+    )
+
+    const rejection = register({ username: 'alice', password: 'secret123' })
+    await expect(rejection).rejects.toBeInstanceOf(ApiError)
+    await expect(rejection).rejects.toMatchObject({ code: 1007 })
+  })
+
+  it('unwraps the runtime envelope returned by the auth config endpoint', async () => {
+    // /auth/config 的契约标注是载荷型，运行时仍是 {code,message,data} 信封。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({ code: 0, data: { public_registration: true, provisioning_enabled: false } }),
+      ),
+    )
+
+    await expect(fetchAuthConfig()).resolves.toEqual({
+      public_registration: true,
+      provisioning_enabled: false,
+    })
   })
 
   it('clears the session on logout but keeps the device token', async () => {

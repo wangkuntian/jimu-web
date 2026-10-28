@@ -1,14 +1,16 @@
 import type { NavigationGuard } from 'vue-router'
 
-import { hasSession } from '../../shared/auth/session'
+import { ensureIdentity } from '../../shared/auth/identity'
+import { clearSession, hasSession } from '../../shared/auth/session'
+import { canAccessAdminSurface, rememberSurfaceForPath } from '../../shared/auth/surfaces'
 
 export const LOGIN_ROUTE = '/login'
-export const DEFAULT_AUTHENTICATED_ROUTE = '/portal'
+export const DEFAULT_AUTHENTICATED_ROUTE = '/hub'
 
 interface GuardTarget {
   path: string
   fullPath: string
-  meta: { public?: boolean }
+  meta: { public?: boolean; requiresAdmin?: boolean }
 }
 
 export type SessionNavigation = true | { path: string; query?: Record<string, string> }
@@ -34,12 +36,49 @@ export function resolveSessionNavigation(to: GuardTarget): SessionNavigation {
 }
 
 /**
+ * 会话引导 + 导航判定。
+ *
+ * 冷启动（sessionStorage 里有 refresh token）与登录后都走这里：受保护路由先取身份，
+ * 页面渲染时 hasPermission 就已经有数据。失败不拦：'unavailable' 只是后端抖动。
+ */
+export async function resolveGuardNavigation(to: GuardTarget): Promise<SessionNavigation> {
+  let identityStatus: Awaited<ReturnType<typeof ensureIdentity>> | null = null
+
+  if (hasSession()) {
+    identityStatus = await ensureIdentity()
+    if (identityStatus === 'unauthenticated') {
+      // 守卫自己会导航，所以用 clearSession 而不是 expireSession，避免订阅二次跳转。
+      clearSession()
+    }
+  }
+
+  const navigation = resolveSessionNavigation(to)
+  if (navigation !== true) {
+    return navigation
+  }
+
+  // 身份不可用时不据此收权：管理页会渲染身份错误态，恢复后仍可重试。
+  if (identityStatus === 'ok' && to.meta.requiresAdmin === true && !canAccessAdminSurface()) {
+    return { path: '/workspace' }
+  }
+
+  if (identityStatus === 'ok') {
+    rememberSurfaceForPath(to.path)
+  }
+
+  return true
+}
+
+/**
  * `RouteMeta` 是 `Record<string | number | symbol, unknown>`，不能直接传给要求
  * `{ public?: boolean }` 的 `GuardTarget`，因此适配时只挑出守卫关心的公开标记。
  */
 export const sessionGuard: NavigationGuard = (to) =>
-  resolveSessionNavigation({
+  resolveGuardNavigation({
     path: to.path,
     fullPath: to.fullPath,
-    meta: { public: to.meta.public === true },
+    meta: {
+      public: to.meta.public === true,
+      requiresAdmin: to.meta.requiresAdmin === true,
+    },
   })

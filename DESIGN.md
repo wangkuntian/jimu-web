@@ -1,6 +1,6 @@
-# Jimu Portal Design System
+# Jimu Hub Design System
 
-本文件是 Jimu Portal 的设计规范本体，供编码 agent 在生成或修改界面时遵循。
+本文件是 Jimu Hub 的设计规范本体，供编码 agent 在生成或修改界面时遵循。
 
 - 视觉取值以本文件为准；实现落点为 `src/styles/main.css`。
 - 选型理由、被否决的候选、Carbon 到 Element Plus 的完整映射表与落地状态，见 [`docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md`](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)。

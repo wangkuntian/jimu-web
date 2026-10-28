@@ -5,7 +5,7 @@ info:
   title: Jimu API
   version: "1.0"
 paths:
-  /api/v1/admin/error-codes:
+  /admin/error-codes:
     get:
       description: 获取所有业务错误码及其对应的 HTTP 状态码映射。用于前端和第三方系统集成时参考。包含错误码、错误消息、HTTP 状态码和分类信息。
       responses:
@@ -15,10 +15,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/response.Body"
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/response.Body"
+      security:
+        - BearerAuth: []
       summary: 获取错误码列表
       tags:
         - 系统管理
-  /api/v1/admin/ratelimit/auth:
+  /admin/ratelimit/auth:
     get:
       description: 不消费令牌地返回某 scope（如 login）+ key（如 ip:1.2.3.4）当前的计数与剩余窗口
       parameters:
@@ -50,12 +58,20 @@ paths:
             "*/*":
               schema:
                 $ref: "#/components/schemas/response.Body"
+        "401":
+          description: Unauthorized
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/response.Body"
         "500":
           description: Internal Server Error
           content:
             "*/*":
               schema:
                 $ref: "#/components/schemas/response.Body"
+      security:
+        - BearerAuth: []
       summary: 查看认证限流状态
       tags:
         - admin/ratelimit
@@ -89,7 +105,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.AuditLogPageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
           content:
@@ -123,7 +139,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.AuditLogBodyResponse"
         "400":
           description: 参数错误（ID 格式无效）
           content:
@@ -234,6 +250,19 @@ paths:
       summary: 校验审计链完整性
       tags:
         - 审计日志
+  /auth/config:
+    get:
+      description: 返回客户端渲染登录/注册入口所需的公开开关。无论是否开放公开注册，本端点都存在。
+      responses:
+        "200":
+          description: 成功，返回注册相关开关
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/interfaces.AuthConfigResponse"
+      summary: 获取认证能力开关
+      tags:
+        - 认证
   /auth/devices:
     delete:
       description: 注销当前用户全部可信设备，用于设备丢失或异常登录后的止损。
@@ -357,7 +386,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/contract.TokenPair"
         "400":
           description: 参数错误（用户名或密码格式不符）
           content:
@@ -457,6 +486,33 @@ paths:
       security:
         - BearerAuth: []
       summary: 退出所有会话
+      tags:
+        - 认证
+  /auth/me:
+    get:
+      description: 返回当前用户的身份、角色与有效权限点（resource + action，与 Casbin 策略同形，resource 支持通配）。
+      responses:
+        "200":
+          description: 成功，返回身份与权限点
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/application.MeView"
+        "401":
+          description: 未认证
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+      security:
+        - BearerAuth: []
+      summary: 获取当前会话身份与权限点
       tags:
         - 认证
   /auth/mfa/disable:
@@ -564,7 +620,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/contract.TokenPair"
         "400":
           description: 参数错误
           content:
@@ -585,7 +641,7 @@ paths:
       description: >-
         注册新用户账户。仅当系统配置中 public_registration 为 true 时可用。支持 IP 维度的限流保护。
 
-        开通式注册（auth.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
+        开通式注册（tenant.provisioning.enabled=true）时，body 携带 tenant_name 即创建新租户并成为其 owner，按模板初始化角色权限，返回 {user, tenant}；未携带 tenant_name 报参数错误。
 
         普通注册（未启用开通式）时忽略租户字段，用户归默认租户，返回用户信息。
 
@@ -603,7 +659,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.RegisterResponse"
         "400":
           description: 参数错误（如用户名已存在、租户编码格式无效或已存在）
           content:
@@ -974,9 +1030,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.PermissionPageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1040,7 +1102,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "204":
           description: 删除成功，无返回内容
@@ -1069,7 +1131,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 成功，返回权限信息
@@ -1108,7 +1170,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -1176,15 +1238,36 @@ paths:
           name: order
           schema:
             type: string
+        - description: 目标租户 ID；省略时跨租户查询
+          in: query
+          name: tenant_id
+          schema:
+            type: string
+        - description: 角色名称模糊匹配
+          in: query
+          name: keyword
+          schema:
+            type: string
+        - description: 状态（0=停用 1=启用）
+          in: query
+          name: status
+          schema:
+            type: integer
       responses:
         "200":
           description: 成功，返回分页角色列表
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.RolePageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1201,13 +1284,13 @@ paths:
       tags:
         - 角色管理
     post:
-      description: 创建新角色。角色名称必须唯一，用于权限管理和访问控制。
+      description: 创建新角色。平台管理员必须传 tenant_id；首版角色接口仅平台管理员可用。租户内角色名唯一。
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/application.CreateRoleRequest"
-        description: 角色信息（名称和描述）
+        description: 角色信息（租户、名称和描述）
         required: true
       responses:
         "201":
@@ -1215,9 +1298,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.RoleBodyResponse"
         "400":
           description: 参数错误（如名称为空）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 租户不存在
           content:
             application/json:
               schema:
@@ -1241,19 +1336,38 @@ paths:
         - 角色管理
   "/roles/{id}":
     delete:
-      description: 软删除指定角色。删除后角色数据仍保留在数据库中，但无法分配给用户。
+      description: 永久删除未分配给用户的自定义角色，同时清理其权限关联。系统角色返回 403；角色已分配给用户时返回 409。停用角色请使用更新接口并将
+        status 设为 0。
       parameters:
         - description: 角色 ID
           in: path
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "204":
           description: 删除成功，无返回内容
         "400":
           description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问或系统角色不可删除
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "409":
+          description: 角色已分配给用户
           content:
             application/json:
               schema:
@@ -1270,23 +1384,29 @@ paths:
       tags:
         - 角色管理
     get:
-      description: 根据角色 ID 获取角色详细信息，包括关联的权限列表。
+      description: 根据角色 ID 获取角色详细信息。权限列表由 GET /roles/{id}/permissions 单独读取。
       parameters:
         - description: 角色 ID
           in: path
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 成功，返回角色信息
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.RoleBodyResponse"
         "400":
           description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1309,14 +1429,14 @@ paths:
       tags:
         - 角色管理
     put:
-      description: 更新指定角色的名称或描述。
+      description: 更新指定角色的名称、描述或状态。tenant_id 不可修改。
       parameters:
         - description: 角色 ID
           in: path
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -1333,6 +1453,12 @@ paths:
                 $ref: "#/components/schemas/response.Body"
         "400":
           description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
           content:
             application/json:
               schema:
@@ -1361,15 +1487,60 @@ paths:
       tags:
         - 角色管理
   "/roles/{id}/permissions":
-    post:
-      description: 为指定角色分配权限。传入权限 ID 数组，角色将被赋予这些权限。原有权限会被替换。
+    get:
+      description: 返回指定角色当前已分配的权限。没有权限时返回空数组。
       parameters:
         - description: 角色 ID
           in: path
           name: id
           required: true
           schema:
-            type: integer
+            type: string
+      responses:
+        "200":
+          description: 成功，返回角色权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/application.PermissionListResponse"
+        "400":
+          description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "500":
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+      security:
+        - BearerAuth: []
+      summary: 获取角色当前权限
+      tags:
+        - 角色管理
+    post:
+      description: 整体替换角色权限。权限 ID 使用字符串；空数组表示清空该角色权限。
+      parameters:
+        - description: 角色 ID
+          in: path
+          name: id
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -1390,6 +1561,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 仅平台管理员可访问或无权授予指定权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
         "500":
           description: 服务器内部错误
           content:
@@ -1399,6 +1582,45 @@ paths:
       security:
         - BearerAuth: []
       summary: 分配角色权限
+      tags:
+        - 角色管理
+  /roles/options:
+    get:
+      description: 返回指定租户内启用且可分配给用户的角色摘要。平台管理员查看默认租户时同时返回平台角色；租户身份只能读取当前租户。
+      parameters:
+        - description: 目标租户 ID（平台管理员可选）
+          in: query
+          name: tenant_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功，返回角色选项
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/application.RoleOptionListResponse"
+        "400":
+          description: 参数错误（tenant_id 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "403":
+          description: 跨租户访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "500":
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+      security:
+        - BearerAuth: []
+      summary: 获取可分配角色选项
       tags:
         - 角色管理
   /tenant-plans:
@@ -1421,7 +1643,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.PlanPageResponse"
         "400":
           description: 参数错误
           content:
@@ -1475,7 +1697,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 删除成功
@@ -1508,7 +1730,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -1564,13 +1786,23 @@ paths:
           name: order
           schema:
             type: string
+        - description: 编码或名称模糊匹配
+          in: query
+          name: keyword
+          schema:
+            type: string
+        - description: 状态（0=停用 1=启用）
+          in: query
+          name: status
+          schema:
+            type: integer
       responses:
         "200":
           description: 成功，返回分页租户列表
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.TenantPageResponse"
         "400":
           description: 参数错误（如无效的排序字段）
           content:
@@ -1603,7 +1835,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.TenantBodyResponse"
         "400":
           description: 参数错误（编码格式无效）
           content:
@@ -1636,7 +1868,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 删除成功
@@ -1681,14 +1913,14 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 成功，返回租户信息
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.TenantBodyResponse"
         "400":
           description: 参数错误（ID 格式无效）
           content:
@@ -1720,7 +1952,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -1760,14 +1992,14 @@ paths:
         - 租户管理
   "/tenants/{id}/plan":
     put:
-      description: 为指定租户分配套餐；plan_id=0 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
+      description: 为指定租户分配套餐；plan_id="0" 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
       parameters:
         - description: 租户 ID
           in: path
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -1822,7 +2054,7 @@ paths:
         - 租户运营
   /users:
     get:
-      description: 分页获取用户列表。支持按 ID、用户名、创建时间排序，可指定升序或降序。
+      description: 分页获取用户列表。平台管理员可跨租户查询；租户管理员只能看到本租户，范围由后端身份决定。
       parameters:
         - description: 页码（默认 1）
           in: query
@@ -1844,13 +2076,28 @@ paths:
           name: order
           schema:
             type: string
+        - description: 用户名子串
+          in: query
+          name: username
+          schema:
+            type: string
+        - description: 状态（0 停用 / 1 启用）
+          in: query
+          name: status
+          schema:
+            type: integer
+        - description: 所属租户 ID（平台级视角可筛选）
+          in: query
+          name: tenant_id
+          schema:
+            type: string
       responses:
         "200":
           description: 成功，返回分页用户列表
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/contract.PageResponse"
+                $ref: "#/components/schemas/application.UserPageResponse"
         "400":
           description: 参数错误（如无效的排序字段或排序方向）
           content:
@@ -1869,13 +2116,13 @@ paths:
       tags:
         - 用户管理
     post:
-      description: 创建新用户账户。用户名必须唯一，密码需符合强度要求（8-32位，包含字母和数字）。支持幂等性保护（通过 Idempotency-Key 请求头）。
+      description: 创建新用户账户。平台管理员必须指定 tenant_id 并可同时分配 role_ids；租户管理员由后端强制使用当前租户。
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/application.CreateUserRequest"
-        description: 用户信息（用户名和密码）
+        description: 用户信息、所属租户与角色
         required: true
       responses:
         "201":
@@ -1883,7 +2130,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.UserBodyResponse"
         "400":
           description: 参数错误（如用户名格式不符、密码强度不足）
           content:
@@ -1909,19 +2156,32 @@ paths:
         - 用户管理
   "/users/{id}":
     delete:
-      description: 软删除指定用户。删除后用户数据仍保留在数据库中，但无法登录系统。
+      description: 删除指定用户（软删除，账号从常规查询中消失）。最后一个有效平台超级管理员返回 409；如需保留账号并禁止登录，请使用更新接口将
+        status 设为 0。
       parameters:
         - description: 用户 ID
           in: path
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "204":
           description: 删除成功，无返回内容
         "400":
           description: 参数错误（ID 格式无效）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "409":
+          description: 不能删除最后一个有效平台超级管理员
           content:
             application/json:
               schema:
@@ -1945,14 +2205,14 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: 成功，返回用户信息
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/response.Body"
+                $ref: "#/components/schemas/application.UserBodyResponse"
         "400":
           description: 参数错误（ID 格式无效）
           content:
@@ -1984,7 +2244,7 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         content:
           application/json:
@@ -2022,6 +2282,47 @@ paths:
       summary: 更新用户信息
       tags:
         - 用户管理
+  "/users/{id}/roles":
+    post:
+      description: 替换指定用户的全部角色（按角色 ID）。角色必须属于用户所属租户，不存在返回 404。
+      parameters:
+        - description: 用户 ID
+          in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/application.AssignUserRolesRequest"
+        description: 角色 ID 列表
+        required: true
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/response.Body"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+        "404":
+          description: 用户或角色不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/contract.ErrorResponse"
+      security:
+        - BearerAuth: []
+      summary: 分配用户角色
+      tags:
+        - 权限管理
   /users/batch-delete:
     post:
       description: 批量软删除用户（单次最多 100 个）。返回成功/失败计数。
@@ -2096,7 +2397,7 @@ components:
       properties:
         permission_ids:
           items:
-            type: integer
+            type: string
           type: array
       required:
         - permission_ids
@@ -2104,7 +2405,71 @@ components:
     application.AssignPlanRequest:
       properties:
         plan_id:
+          type: string
+      type: object
+    application.AssignUserRolesRequest:
+      properties:
+        role_ids:
+          items:
+            type: string
+          type: array
+      type: object
+    application.AuditLogBodyResponse:
+      properties:
+        code:
           type: integer
+        data:
+          $ref: "#/components/schemas/application.AuditLogResponse"
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.AuditLogPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.AuditLogResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.AuditLogResponse:
+      properties:
+        action:
+          type: string
+        created_at:
+          type: string
+        detail:
+          type: string
+        id:
+          type: integer
+        ip:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        resource:
+          type: string
+        status:
+          type: integer
+        tenant_id:
+          type: string
+        user_id:
+          type: integer
+        username:
+          type: string
       type: object
     application.BatchDeleteRequest:
       properties:
@@ -2162,6 +2527,8 @@ components:
           type: string
         name:
           type: string
+        tenant_id:
+          type: string
       required:
         - name
       type: object
@@ -2188,6 +2555,12 @@ components:
           type: string
         phone:
           type: string
+        role_ids:
+          items:
+            type: string
+          type: array
+        tenant_id:
+          type: string
         username:
           maxLength: 64
           minLength: 3
@@ -2195,6 +2568,295 @@ components:
       required:
         - password
         - username
+      type: object
+    application.MeUser:
+      properties:
+        created_at:
+          type: string
+        id:
+          type: integer
+        status:
+          type: integer
+        tenant_id:
+          type: integer
+        username:
+          type: string
+      type: object
+    application.MeView:
+      properties:
+        permissions:
+          items:
+            $ref: "#/components/schemas/application.PermissionPoint"
+          type: array
+        roles:
+          items:
+            type: string
+          type: array
+        user:
+          $ref: "#/components/schemas/application.MeUser"
+      type: object
+    application.PermissionListResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.PermissionResponse"
+          type: array
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.PermissionPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.PermissionResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.PermissionPoint:
+      properties:
+        action:
+          type: string
+        resource:
+          type: string
+      type: object
+    application.PermissionResponse:
+      properties:
+        action:
+          type: string
+        created_at:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        resource:
+          type: string
+      type: object
+    application.PlanPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.PlanResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.PlanResponse:
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        max_api_keys:
+          type: integer
+        max_roles:
+          type: integer
+        max_users:
+          type: integer
+        name:
+          type: string
+      type: object
+    application.RegisterResponse:
+      properties:
+        tenant:
+          $ref: "#/components/schemas/application.RegisterTenantView"
+        user:
+          $ref: "#/components/schemas/application.RegisterUserView"
+      type: object
+    application.RegisterTenantView:
+      properties:
+        code:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: integer
+      type: object
+    application.RegisterUserView:
+      properties:
+        created_at:
+          type: string
+        email:
+          type: string
+        id:
+          type: integer
+        phone:
+          type: string
+        status:
+          type: integer
+        tenant_id:
+          type: integer
+        updated_at:
+          type: string
+        username:
+          type: string
+      type: object
+    application.RoleBodyResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/application.RoleResponse"
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.RoleOptionListResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.RoleOptionResponse"
+          type: array
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.RoleOptionResponse:
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        is_system:
+          type: boolean
+        name:
+          type: string
+        scope:
+          $ref: "#/components/schemas/contract.RoleScope"
+      type: object
+    application.RolePageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.RoleResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.RoleRef:
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      type: object
+    application.RoleResponse:
+      properties:
+        code:
+          type: string
+        created_at:
+          type: string
+        description:
+          type: string
+        id:
+          type: string
+        is_system:
+          type: boolean
+        name:
+          type: string
+        scope:
+          $ref: "#/components/schemas/contract.RoleScope"
+        status:
+          type: integer
+        tenant_id:
+          type: string
+        updated_at:
+          type: string
+      type: object
+    application.TenantBodyResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/application.TenantResponse"
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.TenantPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.TenantResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.TenantRef:
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      type: object
+    application.TenantResponse:
+      properties:
+        code:
+          type: string
+        created_at:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        plan_id:
+          type: string
+        status:
+          type: integer
+        updated_at:
+          type: string
       type: object
     application.UpdatePermissionRequest:
       properties:
@@ -2231,6 +2893,11 @@ components:
           type: string
         name:
           type: string
+        status:
+          enum:
+            - 0
+            - 1
+          type: integer
       required:
         - name
       type: object
@@ -2248,11 +2915,68 @@ components:
       type: object
     application.UpdateUserRequest:
       properties:
+        email:
+          type: string
+        phone:
+          type: string
         status:
           enum:
             - 0
             - 1
           type: integer
+      type: object
+    application.UserBodyResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/application.UserResponse"
+        message:
+          type: string
+        request_id:
+          type: string
+      type: object
+    application.UserPageResponse:
+      properties:
+        code:
+          type: integer
+        data:
+          items:
+            $ref: "#/components/schemas/application.UserResponse"
+          type: array
+        message:
+          type: string
+        page:
+          type: integer
+        page_size:
+          type: integer
+        request_id:
+          type: string
+        total:
+          type: integer
+      type: object
+    application.UserResponse:
+      properties:
+        created_at:
+          type: string
+        email:
+          type: string
+        id:
+          type: string
+        phone:
+          type: string
+        roles:
+          items:
+            $ref: "#/components/schemas/application.RoleRef"
+          type: array
+        status:
+          type: integer
+        tenant:
+          $ref: "#/components/schemas/application.TenantRef"
+        updated_at:
+          type: string
+        username:
+          type: string
       type: object
     application.VerifyResult:
       properties:
@@ -2305,6 +3029,35 @@ components:
           type: string
         total:
           type: integer
+      type: object
+    contract.RoleScope:
+      enum:
+        - platform
+        - tenant
+      type: string
+      x-enum-varnames:
+        - RoleScopePlatform
+        - RoleScopeTenant
+    contract.TokenPair:
+      properties:
+        access_token:
+          type: string
+        device_token:
+          description: DeviceToken 仅在「记住此设备」成功签发时返回，客户端需安全保存。
+          type: string
+        expires_in:
+          type: integer
+        refresh_token:
+          type: string
+      type: object
+    interfaces.AuthConfigResponse:
+      properties:
+        provisioning_enabled:
+          description: ProvisioningEnabled 开通式注册：注册 = 开通新租户，tenant_name 必填
+          type: boolean
+        public_registration:
+          description: PublicRegistration 是否开放公开注册（false 时 /auth/register 路由不注册）
+          type: boolean
       type: object
     interfaces.disableTOTPRequest:
       properties:
