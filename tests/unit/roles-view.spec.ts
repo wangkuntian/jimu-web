@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, DOMWrapper } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus, { ElMessageBox } from 'element-plus'
@@ -54,7 +54,7 @@ const tenant: Tenant = {
   code: 'default',
   name: '默认租户',
   status: 1,
-  plan_id: 0,
+  plan_id: '0',
   created_at: '2026-10-19T00:00:00Z',
   updated_at: '2026-10-19T00:00:00Z',
 }
@@ -139,6 +139,25 @@ function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number)
   pagination.vm.$emit('current-change', page)
 }
 
+async function clickRowAction(wrapper: ReturnType<typeof mountView>, label: string): Promise<void> {
+  const direct = wrapper
+    .findAll('.management-row-actions button')
+    .find((button) => button.text() === label)
+  if (direct) {
+    await direct.trigger('click')
+    return
+  }
+  await wrapper.get('.management-row-actions button[aria-haspopup="menu"]').trigger('click')
+  const item = await vi.waitFor(() => {
+    const node = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (element) => element.textContent?.trim() === label,
+    )
+    expect(node).toBeDefined()
+    return node!
+  })
+  await new DOMWrapper(item).trigger('click')
+}
+
 function mountView(
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 ) {
@@ -151,10 +170,11 @@ function mountView(
   })
 
   const wrapper = mount(RolesView, {
+    attachTo: document.body,
     global: {
       plugins: [ElementPlus, router, [VueQueryPlugin, { queryClient }]],
       stubs: {
-        teleport: true,
+        teleport: false,
         ElDrawer: {
           props: ['modelValue', 'title'],
           template:
@@ -199,6 +219,21 @@ describe('RolesView', () => {
 
   afterEach(() => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+  })
+
+  it('keeps row actions compact and exposes a named overflow menu', async () => {
+    saveIdentity(roleAdminIdentity)
+
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
+    const actions = wrapper.get('.management-row-actions')
+    expect(actions.findAll('button')).toHaveLength(2)
+    const more = actions.get('button[aria-haspopup="menu"]')
+    expect(more.attributes('aria-label')).toContain('更多操作')
+    await more.trigger('click')
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull())
+    wrapper.unmount()
   })
 
   it('renders the shared management page and role table', async () => {
@@ -349,7 +384,7 @@ describe('RolesView', () => {
     const wrapper = mountView(queryClient)
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
-    await buttonByText(wrapper, '编辑')?.trigger('click')
+    await clickRowAction(wrapper, '编辑')
     await wrapper.find('[data-test="role-edit-submit"]').trigger('click')
 
     await vi.waitFor(() => expect(queryClient.getQueryState(['users'])?.isInvalidated).toBe(true))
@@ -361,7 +396,7 @@ describe('RolesView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="roles-table"]').exists()).toBe(true))
-    await buttonByText(wrapper, '编辑')?.trigger('click')
+    await clickRowAction(wrapper, '编辑')
     await vi.waitFor(() => expect(wrapper.find('[data-test="role-edit-name"]').exists()).toBe(true))
     await wrapper.find('input[data-test="role-edit-name"]').setValue('运营主管')
     await wrapper.find('textarea[data-test="role-edit-description"]').setValue('更新职责')
@@ -377,7 +412,7 @@ describe('RolesView', () => {
       }),
     )
 
-    buttonByText(wrapper, '停用')?.trigger('click')
+    await clickRowAction(wrapper, '停用')
     await vi.waitFor(() =>
       expect(confirm).toHaveBeenCalledWith(
         expect.stringContaining('停用后该角色不再授予权限'),
@@ -393,7 +428,7 @@ describe('RolesView', () => {
       }),
     )
 
-    buttonByText(wrapper, '删除')?.trigger('click')
+    await clickRowAction(wrapper, '删除')
     await vi.waitFor(() =>
       expect(confirm).toHaveBeenLastCalledWith(
         expect.stringContaining('删除后无法恢复'),

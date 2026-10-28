@@ -8,7 +8,7 @@ const tenant = {
   code: 'acme',
   name: 'Acme',
   status: 1,
-  plan_id: 0,
+  plan_id: '0',
   created_at: '2026-10-19T00:00:00Z',
   updated_at: '2026-10-19T00:00:00Z',
 }
@@ -238,7 +238,8 @@ test('shows role option failures and disables role assignment', async ({ page })
   await page.goto('/admin/users')
   await expect(page.getByTestId('users-table')).toContainText('alice')
 
-  await page.getByRole('button', { name: '角色', exact: true }).click()
+  await page.getByRole('button', { name: 'alice的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '分配角色', exact: true }).click()
   const roleDialog = page.locator('.el-dialog').filter({ hasText: '分配角色' })
   await expect(page.getByTestId('user-role-options-error')).toBeVisible()
   await expect(page.getByTestId('user-role-options-error')).toContainText('角色选项加载失败')
@@ -269,7 +270,8 @@ test('edits, reassigns roles, stops, and deletes a user', async ({ page }) => {
     phone: '13900000000',
   })
 
-  await page.getByRole('button', { name: '角色', exact: true }).click()
+  await page.getByRole('button', { name: 'alice的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '分配角色', exact: true }).click()
   const roleDialog = page.locator('.el-dialog').filter({ hasText: '分配角色' })
   await roleDialog.locator('.el-select__wrapper').click()
   await page.getByRole('option', { name: 'reviewer', exact: true }).click()
@@ -278,12 +280,14 @@ test('edits, reassigns roles, stops, and deletes a user', async ({ page }) => {
   await expect(page.getByText('用户角色已更新')).toBeVisible()
   expect(payloads.roles).toEqual({ role_ids: ['role-developer', 'role-reviewer'] })
 
-  await page.getByRole('button', { name: '停用', exact: true }).click()
+  await page.getByRole('button', { name: 'alice的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '停用', exact: true }).click()
   await page.locator('.el-message-box').getByRole('button', { name: '停用' }).click()
   await expect(page.getByText('用户已停用')).toBeVisible()
   expect(payloads.updates[1]).toEqual({ status: 0 })
 
-  await page.getByRole('button', { name: '删除', exact: true }).click()
+  await page.getByRole('button', { name: 'alice的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '删除', exact: true }).click()
   await page.locator('.el-message-box').getByRole('button', { name: '删除' }).click()
   await expect(page.getByText('用户已删除')).toBeVisible()
   expect(payloads.deleted).toEqual([user.id])

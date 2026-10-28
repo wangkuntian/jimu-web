@@ -21,6 +21,7 @@ import type { RoleOption, Tenant, User } from '../../../shared/api/types'
 import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
 import ManagementPage from '../../../shared/components/ManagementPage.vue'
+import ManagementRowActions from '../../../shared/components/ManagementRowActions.vue'
 import { clampPage } from '../../tenants/params'
 
 const canView = computed(() => hasPermission(apiResource('/users'), 'GET'))
@@ -422,8 +423,19 @@ async function onDelete(row: User): Promise<void> {
     @retry-list="usersQuery.refetch()"
     @filter-submit="applyKeyword"
   >
+    <template #actions>
+      <el-button
+        v-if="canCreate && viewState === 'table'"
+        type="primary"
+        data-test="user-create"
+        @click="openCreate"
+      >
+        新建用户
+      </el-button>
+    </template>
+
     <template #filters>
-      <el-form-item label="用户名">
+      <el-form-item label="用户名" class="management-filter-keyword">
         <el-input
           v-model="keywordDraft"
           class="management-filter-input"
@@ -484,14 +496,6 @@ async function onDelete(row: User): Promise<void> {
 
       <el-form-item class="management-filter-actions">
         <el-button data-test="user-search" @click="applyKeyword">搜索</el-button>
-        <el-button
-          v-if="canCreate && viewState === 'table'"
-          type="primary"
-          data-test="user-create"
-          @click="openCreate"
-        >
-          新建用户
-        </el-button>
       </el-form-item>
     </template>
 
@@ -524,30 +528,55 @@ async function onDelete(row: User): Promise<void> {
 
         <el-table-column prop="created_at" label="创建时间" min-width="190" />
 
-        <el-table-column label="操作" min-width="280">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="scope">
-            <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
-              编辑
-            </el-button>
-            <el-button
-              v-if="canAssignRoles(scope.row) && canListRoleOptions"
-              text
-              type="primary"
-              @click="openRoles(scope.row)"
+            <ManagementRowActions
+              v-if="
+                canUpdate(scope.row) ||
+                (canAssignRoles(scope.row) && canListRoleOptions) ||
+                canDelete(scope.row)
+              "
+              :label="scope.row.username"
+              :has-more="
+                (canUpdate(scope.row) &&
+                  ((canAssignRoles(scope.row) && canListRoleOptions) || scope.row.status === 1)) ||
+                canDelete(scope.row)
+              "
             >
-              角色
-            </el-button>
-            <el-button
-              v-if="canUpdate(scope.row) && scope.row.status === 1"
-              text
-              type="danger"
-              @click="onStop(scope.row)"
-            >
-              停用
-            </el-button>
-            <el-button v-if="canDelete(scope.row)" text type="danger" @click="onDelete(scope.row)">
-              删除
-            </el-button>
+              <el-button
+                v-if="canUpdate(scope.row)"
+                text
+                type="primary"
+                @click="openEdit(scope.row)"
+                >编辑</el-button
+              >
+              <el-button
+                v-else-if="canAssignRoles(scope.row) && canListRoleOptions"
+                text
+                type="primary"
+                @click="openRoles(scope.row)"
+                >角色</el-button
+              >
+              <template #more>
+                <el-dropdown-item
+                  v-if="canUpdate(scope.row) && canAssignRoles(scope.row) && canListRoleOptions"
+                  @click="openRoles(scope.row)"
+                  >分配角色</el-dropdown-item
+                >
+                <el-dropdown-item
+                  v-if="canUpdate(scope.row) && scope.row.status === 1"
+                  @click="onStop(scope.row)"
+                  >停用</el-dropdown-item
+                >
+                <el-dropdown-item
+                  v-if="canDelete(scope.row)"
+                  divided
+                  class="management-action-danger"
+                  @click="onDelete(scope.row)"
+                  >删除</el-dropdown-item
+                >
+              </template>
+            </ManagementRowActions>
           </template>
         </el-table-column>
       </el-table>
@@ -771,10 +800,6 @@ async function onDelete(row: User): Promise<void> {
 </template>
 
 <style scoped>
-.users-table {
-  min-width: 1050px;
-}
-
 .user-identity {
   display: grid;
   gap: 2px;

@@ -22,6 +22,7 @@ import type { Permission, Role, Tenant } from '../../../shared/api/types'
 import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
 import ManagementPage from '../../../shared/components/ManagementPage.vue'
+import ManagementRowActions from '../../../shared/components/ManagementRowActions.vue'
 import { clampPage } from '../../tenants/params'
 
 interface PermissionGroup {
@@ -526,7 +527,33 @@ async function submitPermissions(): Promise<void> {
     @retry-list="rolesQuery.refetch()"
     @filter-submit="applyKeyword"
   >
+    <template #actions>
+      <el-button
+        v-if="canCreateRole && viewState === 'table'"
+        type="primary"
+        data-test="role-create"
+        @click="openCreate"
+      >
+        新建角色
+      </el-button>
+    </template>
+
     <template #filters>
+      <el-form-item label="角色名称" class="management-filter-keyword">
+        <el-input
+          v-model="keywordDraft"
+          class="management-filter-input"
+          clearable
+          placeholder="搜索角色名称"
+          data-test="role-keyword-filter"
+          @keyup.enter="applyKeyword"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+      </el-form-item>
+
       <el-form-item v-if="canListTenants" label="租户">
         <el-select
           v-model="filters.tenantId"
@@ -545,21 +572,6 @@ async function submitPermissions(): Promise<void> {
             :value="tenantOption.id"
           />
         </el-select>
-      </el-form-item>
-
-      <el-form-item label="角色名称">
-        <el-input
-          v-model="keywordDraft"
-          class="management-filter-input"
-          clearable
-          placeholder="搜索角色名称"
-          data-test="role-keyword-filter"
-          @keyup.enter="applyKeyword"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
       </el-form-item>
 
       <el-form-item label="状态">
@@ -588,14 +600,6 @@ async function submitPermissions(): Promise<void> {
 
       <el-form-item class="management-filter-actions">
         <el-button data-test="role-search" @click="applyKeyword">搜索</el-button>
-        <el-button
-          v-if="canCreateRole && viewState === 'table'"
-          type="primary"
-          data-test="role-create"
-          @click="openCreate"
-        >
-          新建角色
-        </el-button>
       </el-form-item>
     </template>
 
@@ -636,30 +640,51 @@ async function submitPermissions(): Promise<void> {
 
         <el-table-column prop="created_at" label="创建时间" min-width="190" />
 
-        <el-table-column label="操作" min-width="280">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="scope">
-            <el-button
-              v-if="canViewPermissions(scope.row)"
-              text
-              type="primary"
-              @click="openPermissions(scope.row)"
+            <ManagementRowActions
+              v-if="canViewPermissions(scope.row) || canUpdate(scope.row) || canDelete(scope.row)"
+              :label="scope.row.name"
+              :has-more="
+                (canViewPermissions(scope.row) && canUpdate(scope.row)) ||
+                (canUpdate(scope.row) && scope.row.status === 1) ||
+                canDelete(scope.row)
+              "
             >
-              {{ canSavePermissions(scope.row) ? '权限' : '查看权限' }}
-            </el-button>
-            <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
-              编辑
-            </el-button>
-            <el-button
-              v-if="canUpdate(scope.row) && scope.row.status === 1"
-              text
-              type="danger"
-              @click="onStop(scope.row)"
-            >
-              停用
-            </el-button>
-            <el-button v-if="canDelete(scope.row)" text type="danger" @click="onDelete(scope.row)">
-              删除
-            </el-button>
+              <el-button
+                v-if="canViewPermissions(scope.row)"
+                text
+                type="primary"
+                @click="openPermissions(scope.row)"
+                >{{ canSavePermissions(scope.row) ? '权限' : '查看权限' }}</el-button
+              >
+              <el-button
+                v-else-if="canUpdate(scope.row)"
+                text
+                type="primary"
+                @click="openEdit(scope.row)"
+                >编辑</el-button
+              >
+              <template #more>
+                <el-dropdown-item
+                  v-if="canViewPermissions(scope.row) && canUpdate(scope.row)"
+                  @click="openEdit(scope.row)"
+                  >编辑</el-dropdown-item
+                >
+                <el-dropdown-item
+                  v-if="canUpdate(scope.row) && scope.row.status === 1"
+                  @click="onStop(scope.row)"
+                  >停用</el-dropdown-item
+                >
+                <el-dropdown-item
+                  v-if="canDelete(scope.row)"
+                  divided
+                  class="management-action-danger"
+                  @click="onDelete(scope.row)"
+                  >删除</el-dropdown-item
+                >
+              </template>
+            </ManagementRowActions>
           </template>
         </el-table-column>
       </el-table>
@@ -890,10 +915,6 @@ async function submitPermissions(): Promise<void> {
 </template>
 
 <style scoped>
-.roles-table {
-  min-width: 1120px;
-}
-
 .role-identity {
   display: grid;
   gap: 2px;

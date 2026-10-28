@@ -39,7 +39,7 @@ describe('tenants api', () => {
             code: 'default',
             name: '默认租户',
             status: 1,
-            plan_id: 0,
+            plan_id: '0',
             created_at: '',
             updated_at: '',
           },
@@ -59,7 +59,7 @@ describe('tenants api', () => {
           code: 'default',
           name: '默认租户',
           status: 1,
-          plan_id: 0,
+          plan_id: '0',
           created_at: '',
           updated_at: '',
         },
@@ -138,7 +138,7 @@ describe('tenants api', () => {
           code: 'acme',
           name: 'Acme',
           status: 1,
-          plan_id: 0,
+          plan_id: '0',
           created_at: '',
           updated_at: '',
         },
@@ -197,10 +197,25 @@ describe('tenants api', () => {
       response: new Response(null, { status: 200 }),
     })
 
-    await expect(assignTenantPlan('4', 0)).resolves.toBeUndefined()
+    await expect(assignTenantPlan('4', '0')).resolves.toBeUndefined()
     expect(putMock).toHaveBeenCalledWith('/tenants/{id}/plan', {
       params: { path: { id: '4' } },
-      body: { plan_id: 0 },
+      body: { plan_id: '0' },
+    })
+  })
+
+  it('assigns a snowflake plan id without changing its decimal string', async () => {
+    const planId = '373398409660334080'
+    putMock.mockResolvedValueOnce({
+      data: { code: 0, message: 'ok' },
+      response: new Response(null, { status: 200 }),
+    })
+
+    await assignTenantPlan('4', planId)
+
+    expect(putMock).toHaveBeenCalledWith('/tenants/{id}/plan', {
+      params: { path: { id: '4' } },
+      body: { plan_id: planId },
     })
   })
 

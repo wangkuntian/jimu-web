@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+
 type ManagementPageState = 'forbidden' | 'identity-error' | 'loading' | 'error' | 'empty' | 'table'
 
 withDefaults(
@@ -40,6 +42,12 @@ const emit = defineEmits<{
         <h1 :id="titleId">{{ title }}</h1>
         <p class="management-lead">{{ description }}</p>
       </div>
+      <div
+        v-if="$slots.actions && state !== 'forbidden' && state !== 'identity-error'"
+        class="management-heading-actions"
+      >
+        <slot name="actions" />
+      </div>
     </header>
 
     <div v-if="state === 'forbidden'" class="management-state">
@@ -77,7 +85,8 @@ const emit = defineEmits<{
         v-if="$slots.filters"
         class="management-filters"
         :data-test="`${testIdPrefix}-filters`"
-        inline
+        label-position="top"
+        :aria-label="`${title}筛选`"
         @submit.prevent="emit('filter-submit')"
       >
         <slot name="filters" />
@@ -117,17 +126,25 @@ const emit = defineEmits<{
         <slot name="table" />
       </div>
 
-      <el-pagination
+      <footer
         v-if="total > 0 && (state === 'table' || state === 'empty')"
-        class="management-pagination"
-        :data-test="`${testIdPrefix}-pagination`"
-        :current-page="page"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next, total"
-        background
-        @update:current-page="emit('update:page', $event)"
-      />
+        class="management-footer"
+      >
+        <el-config-provider :locale="zhCn">
+          <el-pagination
+            class="management-pagination"
+            :data-test="`${testIdPrefix}-pagination`"
+            :current-page="page"
+            :page-size="pageSize"
+            :total="total"
+            :pager-count="5"
+            :aria-label="`${title}分页`"
+            layout="total, prev, pager, next"
+            background
+            @update:current-page="emit('update:page', $event)"
+          />
+        </el-config-provider>
+      </footer>
     </template>
 
     <slot name="dialogs" />
@@ -149,6 +166,12 @@ const emit = defineEmits<{
 
 .management-heading-copy {
   min-width: 0;
+}
+
+.management-heading-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .management-eyebrow {
@@ -176,8 +199,8 @@ const emit = defineEmits<{
 .management-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
+  gap: 16px;
+  align-items: flex-end;
   padding: 16px;
   background: var(--jp-color-surface);
   border: 1px solid var(--jp-color-hairline);
@@ -185,23 +208,44 @@ const emit = defineEmits<{
 }
 
 .management-filters :deep(.el-form-item) {
+  flex: 1 1 144px;
+  min-width: 0;
   margin: 0;
 }
 
-.management-filters :slotted(.management-filter-input) {
-  width: 240px;
+.management-filters :deep(.el-form-item__label) {
+  height: auto;
+  margin-bottom: 8px;
+  color: var(--jp-color-text-muted);
+  font-size: var(--jp-font-size-caption);
+  line-height: 1.5;
 }
 
-.management-filters :slotted(.management-filter-select) {
-  width: 160px;
+.management-filters :deep(.management-filter-keyword) {
+  flex: 2 1 220px;
 }
 
-.management-filters :slotted(.management-filter-select--narrow) {
-  width: 120px;
+.management-filters :deep(.management-filter-input),
+.management-filters :deep(.management-filter-select) {
+  width: 100%;
 }
 
-.management-filters :slotted(.management-filter-actions) {
+.management-filters :deep(.management-filter-actions) {
+  flex: 0 0 auto;
   margin-left: auto;
+}
+
+.management-filters :deep(.management-filter-actions .el-form-item__content) {
+  gap: 8px;
+}
+
+.management-filters :deep(.management-filter-actions .el-button + .el-button) {
+  margin-left: 0;
+}
+
+.management-filters :deep(.management-filter-error) {
+  flex-basis: 100%;
+  order: 1;
 }
 
 .management-state {
@@ -220,8 +264,35 @@ const emit = defineEmits<{
   border-radius: var(--jp-radius-control);
 }
 
+.management-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 0;
+}
+
 .management-pagination {
-  margin-top: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.management-pagination :deep(.el-pagination__total) {
+  margin-right: 8px;
+  color: var(--jp-color-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.management-pagination :deep(.btn-prev),
+.management-pagination :deep(.btn-next),
+.management-pagination :deep(.el-pager li) {
+  border: 1px solid var(--jp-color-hairline);
+  border-radius: var(--jp-radius-control);
+  background: var(--jp-color-surface);
+}
+
+.management-pagination :deep(.el-pager li.is-active) {
+  border-color: var(--jp-color-accent);
+  background: var(--jp-color-accent);
 }
 
 .management-request-id {
@@ -233,6 +304,8 @@ const emit = defineEmits<{
 @media (max-width: 640px) {
   .management-heading {
     align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
   }
 
   .management-filters {
@@ -244,14 +317,63 @@ const emit = defineEmits<{
     width: 100%;
   }
 
-  .management-filters :slotted(.management-filter-input),
-  .management-filters :slotted(.management-filter-select),
-  .management-filters :slotted(.management-filter-select--narrow) {
+  .management-filters :deep(.el-form-item) {
+    flex-basis: 100%;
+  }
+
+  .management-filters :deep(.management-filter-actions) {
+    align-items: stretch;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .management-filters :deep(.management-filter-actions .el-form-item__content) {
+    margin-left: 0 !important;
+  }
+
+  .management-filters :deep(.management-filter-actions .el-button) {
     width: 100%;
   }
 
-  .management-filters :slotted(.management-filter-actions) {
-    margin-left: 0;
+  .management-pagination {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    width: 100%;
+  }
+
+  .management-pagination :deep(.el-pagination__total) {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin: 0;
+  }
+
+  .management-pagination :deep(.btn-prev),
+  .management-pagination :deep(.btn-next),
+  .management-pagination :deep(.el-pager) {
+    margin: 0;
+  }
+
+  .management-pagination :deep(.el-pager) {
+    justify-content: center;
+  }
+
+  .management-pagination :deep(.el-pager li:not(.is-active)) {
+    display: none;
+  }
+
+  .management-pagination :deep(.el-pager li) {
+    flex-shrink: 0;
+    margin: 0;
+  }
+
+  .management-filters :deep(.el-input__wrapper),
+  .management-filters :deep(.el-select__wrapper),
+  .management-page :deep(.el-button),
+  .management-pagination :deep(.btn-prev),
+  .management-pagination :deep(.btn-next),
+  .management-pagination :deep(.el-pager li) {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 </style>

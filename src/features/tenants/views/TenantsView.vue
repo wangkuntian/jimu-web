@@ -21,6 +21,7 @@ import type { Plan, Tenant } from '../../../shared/api/types'
 import { ensureIdentity, getIdentityStatus } from '../../../shared/auth/identity'
 import { hasPermission } from '../../../shared/auth/permission'
 import ManagementPage from '../../../shared/components/ManagementPage.vue'
+import ManagementRowActions from '../../../shared/components/ManagementRowActions.vue'
 
 const queryClient = useQueryClient()
 
@@ -295,16 +296,16 @@ async function submitEdit(): Promise<void> {
 }
 
 const planVisible = ref(false)
-const planForm = reactive<{ id: string; code: string; planId: number }>({
+const planForm = reactive<{ id: string; code: string; planId: string }>({
   id: '',
   code: '',
-  planId: 0,
+  planId: '0',
 })
 const planError = ref('')
 const planRequestId = ref('')
 
 const { isPending: assigning, mutateAsync: assignPlanAsync } = useMutation({
-  mutationFn: (input: { id: string; planId: number }) => assignTenantPlan(input.id, input.planId),
+  mutationFn: (input: { id: string; planId: string }) => assignTenantPlan(input.id, input.planId),
   onSuccess: invalidateList,
 })
 
@@ -381,8 +382,19 @@ async function onDelete(row: Tenant): Promise<void> {
     @retry-list="tenantsQuery.refetch()"
     @filter-submit="applyKeyword"
   >
+    <template #actions>
+      <el-button
+        v-if="canCreate && viewState === 'table'"
+        type="primary"
+        data-test="tenant-create"
+        @click="openCreate"
+      >
+        新建租户
+      </el-button>
+    </template>
+
     <template #filters>
-      <el-form-item label="关键词">
+      <el-form-item label="关键词" class="management-filter-keyword">
         <el-input
           v-model="keywordDraft"
           data-test="tenant-keyword"
@@ -431,15 +443,7 @@ async function onDelete(row: Tenant): Promise<void> {
       </el-form-item>
 
       <el-form-item class="management-filter-actions">
-        <el-button @click="applyKeyword">搜索</el-button>
-        <el-button
-          v-if="canCreate && viewState === 'table'"
-          type="primary"
-          data-test="tenant-create"
-          @click="openCreate"
-        >
-          新建租户
-        </el-button>
+        <el-button data-test="tenant-search" @click="applyKeyword">搜索</el-button>
       </el-form-item>
     </template>
 
@@ -460,22 +464,42 @@ async function onDelete(row: Tenant): Promise<void> {
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" min-width="200" />
-        <el-table-column label="操作" min-width="240">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="scope">
-            <el-button v-if="canUpdate(scope.row)" text type="primary" @click="openEdit(scope.row)">
-              编辑
-            </el-button>
-            <el-button v-if="canDelete(scope.row)" text type="danger" @click="onDelete(scope.row)">
-              删除
-            </el-button>
-            <el-button
-              v-if="canAssignPlan(scope.row)"
-              text
-              type="primary"
-              @click="openPlan(scope.row)"
+            <ManagementRowActions
+              v-if="canUpdate(scope.row) || canAssignPlan(scope.row) || canDelete(scope.row)"
+              :label="scope.row.name"
+              :has-more="(canUpdate(scope.row) && canAssignPlan(scope.row)) || canDelete(scope.row)"
             >
-              分配套餐
-            </el-button>
+              <el-button
+                v-if="canUpdate(scope.row)"
+                text
+                type="primary"
+                @click="openEdit(scope.row)"
+                >编辑</el-button
+              >
+              <el-button
+                v-else-if="canAssignPlan(scope.row)"
+                text
+                type="primary"
+                @click="openPlan(scope.row)"
+                >分配套餐</el-button
+              >
+              <template #more>
+                <el-dropdown-item
+                  v-if="canUpdate(scope.row) && canAssignPlan(scope.row)"
+                  @click="openPlan(scope.row)"
+                  >分配套餐</el-dropdown-item
+                >
+                <el-dropdown-item
+                  v-if="canDelete(scope.row)"
+                  divided
+                  class="management-action-danger"
+                  @click="onDelete(scope.row)"
+                  >删除</el-dropdown-item
+                >
+              </template>
+            </ManagementRowActions>
           </template>
         </el-table-column>
       </el-table>
@@ -582,9 +606,9 @@ async function onDelete(row: Tenant): Promise<void> {
               :disabled="plansUnavailable"
               :placeholder="plansPlaceholder"
             >
-              <el-option label="取消套餐（不限）" :value="0" />
+              <el-option label="取消套餐（不限）" value="0" />
               <el-option
-                v-if="!plansQuery.isSuccess.value && planForm.planId !== 0"
+                v-if="!plansQuery.isSuccess.value && planForm.planId !== '0'"
                 :label="`当前套餐 #${planForm.planId}`"
                 :value="planForm.planId"
               />
@@ -618,10 +642,6 @@ async function onDelete(row: Tenant): Promise<void> {
 </template>
 
 <style scoped>
-.tenants-table {
-  min-width: 960px;
-}
-
 .tenant-form {
   margin-top: 16px;
 }

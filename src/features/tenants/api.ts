@@ -70,8 +70,8 @@ export async function deleteTenant(id: string): Promise<void> {
   unwrapOk(resolveEnvelope({ data, error, response }))
 }
 
-/** 分配套餐；plan_id=0 表示取消套餐，请求体必须保留这个 0。 */
-export async function assignTenantPlan(id: string, planId: number): Promise<void> {
+/** 分配套餐；plan_id="0" 表示取消套餐，请求体必须保留这个字符串。 */
+export async function assignTenantPlan(id: string, planId: string): Promise<void> {
   const { data, error, response } = await api.PUT('/tenants/{id}/plan', {
     params: { path: { id } },
     body: { plan_id: planId },

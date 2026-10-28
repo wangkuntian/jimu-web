@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import ElementPlus, { ElPagination } from 'element-plus'
+import ElementPlus, { ElForm, ElPagination } from 'element-plus'
 import { describe, expect, it } from 'vitest'
 
 import ManagementPage from '../../src/shared/components/ManagementPage.vue'
@@ -24,6 +24,7 @@ function mountPage(
       pageSize: 20,
     },
     slots: {
+      actions: '<button data-test="users-heading-create">新建用户</button>',
       filters: `
         <el-form-item label="用户名">
           <el-input data-test="users-filter" />
@@ -40,6 +41,40 @@ function mountPage(
 }
 
 describe('ManagementPage', () => {
+  it('separates page actions from labeled filters and submits the search form', async () => {
+    const wrapper = mountPage('table')
+
+    expect(wrapper.find('.management-heading [data-test="users-heading-create"]').exists()).toBe(
+      true,
+    )
+    expect(wrapper.findComponent(ElForm).props('labelPosition')).toBe('top')
+    expect(wrapper.findComponent(ElForm).props('inline')).toBe(false)
+    await wrapper.get('[data-test="users-filters"]').trigger('submit')
+    expect(wrapper.emitted('filter-submit')).toEqual([[]])
+  })
+
+  it('places the compact pager in a footer with the result count first', () => {
+    const wrapper = mountPage('table')
+
+    expect(wrapper.find('.management-footer [data-test="users-pagination"]').exists()).toBe(true)
+    expect(wrapper.findComponent(ElPagination).props('layout')).toBe('total, prev, pager, next')
+    expect(wrapper.findComponent(ElPagination).props('pagerCount')).toBe(5)
+  })
+
+  it('renders pagination totals and navigation labels in Chinese', () => {
+    const wrapper = mountPage('table')
+
+    expect(wrapper.get('[data-test="users-pagination"]').text()).toContain('共 41 条')
+    expect(wrapper.find('button[aria-label="下一页"]').exists()).toBe(true)
+  })
+
+  it('hides page actions when identity or access is unavailable', () => {
+    for (const state of ['forbidden', 'identity-error'] as const) {
+      const wrapper = mountPage(state)
+      expect(wrapper.find('[data-test="users-heading-create"]').exists()).toBe(false)
+    }
+  })
+
   it('renders the shared heading, filters, table surface, dialog slot, and pagination', async () => {
     const wrapper = mountPage('table')
 

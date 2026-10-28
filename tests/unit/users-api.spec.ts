@@ -176,7 +176,7 @@ describe('users api', () => {
             code: 'acme',
             name: 'Acme',
             status: 1,
-            plan_id: 0,
+            plan_id: '0',
             created_at: '',
             updated_at: '',
           },
@@ -200,7 +200,14 @@ describe('users api', () => {
         data: {
           code: 0,
           data: [
-            { ...user.tenant, code: 'acme', status: 1, plan_id: 0, created_at: '', updated_at: '' },
+            {
+              ...user.tenant,
+              code: 'acme',
+              status: 1,
+              plan_id: '0',
+              created_at: '',
+              updated_at: '',
+            },
           ],
           total: 101,
           page: 1,
@@ -217,7 +224,7 @@ describe('users api', () => {
               code: 'last',
               name: 'Last',
               status: 1,
-              plan_id: 0,
+              plan_id: '0',
               created_at: '',
               updated_at: '',
             },

@@ -79,7 +79,8 @@ test('create → assign plan → delete a runtime-created tenant', async ({ page
   await expect(page.getByTestId('tenants-table')).toContainText(tenantCode)
 
   const row = page.getByRole('row', { name: new RegExp(tenantCode) })
-  await row.getByRole('button', { name: '分配套餐' }).click()
+  await row.getByRole('button', { name: /更多操作/ }).click()
+  await page.getByRole('menuitem', { name: '分配套餐', exact: true }).click()
   // 套餐下拉同时有 aria-label="套餐" 的 combobox 与 listbox，getByLabel 会撞 strict mode；
   // 而 combobox 输入框被已选项占位元素挡住，可点的是 el-select 的外层 wrapper。
   const planDialog = page.locator('.el-dialog').filter({ hasText: '分配套餐' })
@@ -96,7 +97,8 @@ test('create → assign plan → delete a runtime-created tenant', async ({ page
   await expect(row).toContainText(planName)
 
   // 行内「删除」与确认框的确认按钮文案都是「删除」，确认按钮定位到 message box 内。
-  await row.getByRole('button', { name: '删除' }).click()
+  await row.getByRole('button', { name: /更多操作/ }).click()
+  await page.getByRole('menuitem', { name: '删除', exact: true }).click()
   await page.locator('.el-message-box').getByRole('button', { name: '删除' }).click()
   await expect(page.getByTestId('tenants-table')).not.toContainText(tenantCode)
 })

@@ -2810,7 +2810,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 套餐 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -2861,7 +2861,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description 套餐 ID */
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
@@ -3225,7 +3225,7 @@ export interface paths {
         get?: never;
         /**
          * 为租户分配套餐
-         * @description 为指定租户分配套餐；plan_id=0 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
+         * @description 为指定租户分配套餐；plan_id="0" 表示取消套餐（取消后不再受配额限制）。超限时不影响既有数据，只阻止继续创建。
          */
         put: {
             parameters: {
@@ -3821,7 +3821,7 @@ export interface components {
             permission_ids: string[];
         };
         "application.AssignPlanRequest": {
-            plan_id?: number;
+            plan_id?: string;
         };
         "application.AssignUserRolesRequest": {
             role_ids?: string[];
@@ -3939,7 +3939,7 @@ export interface components {
         };
         "application.PlanResponse": {
             code?: string;
-            id?: number;
+            id?: string;
             max_api_keys?: number;
             max_roles?: number;
             max_users?: number;
@@ -4033,7 +4033,7 @@ export interface components {
             created_at?: string;
             id?: string;
             name?: string;
-            plan_id?: number;
+            plan_id?: string;
             status?: number;
             updated_at?: string;
         };

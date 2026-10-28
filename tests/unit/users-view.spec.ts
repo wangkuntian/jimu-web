@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, DOMWrapper } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus from 'element-plus'
@@ -65,7 +65,7 @@ const tenant = {
   code: 'acme',
   name: 'Acme',
   status: 1,
-  plan_id: 0,
+  plan_id: '0',
   created_at: '',
   updated_at: '',
 }
@@ -123,6 +123,25 @@ function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number)
   pagination.vm.$emit('current-change', page)
 }
 
+async function clickRowAction(wrapper: ReturnType<typeof mountView>, label: string): Promise<void> {
+  const direct = wrapper
+    .findAll('.management-row-actions button')
+    .find((button) => button.text() === label)
+  if (direct) {
+    await direct.trigger('click')
+    return
+  }
+  await wrapper.get('.management-row-actions button[aria-haspopup="menu"]').trigger('click')
+  const item = await vi.waitFor(() => {
+    const node = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (element) => element.textContent?.trim() === label,
+    )
+    expect(node).toBeDefined()
+    return node!
+  })
+  await new DOMWrapper(item).trigger('click')
+}
+
 function mountView(
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 ) {
@@ -135,10 +154,11 @@ function mountView(
   })
 
   const wrapper = mount(UsersView, {
+    attachTo: document.body,
     global: {
       plugins: [ElementPlus, router, [VueQueryPlugin, { queryClient }]],
       stubs: {
-        teleport: true,
+        teleport: false,
         ElDrawer: {
           props: ['modelValue', 'title'],
           template: '<section v-if="modelValue"><h2>{{ title }}</h2><slot /></section>',
@@ -180,6 +200,21 @@ describe('UsersView', () => {
 
   afterEach(() => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+  })
+
+  it('keeps row actions compact and exposes a named overflow menu', async () => {
+    saveIdentity(fullAdminIdentity)
+    listUsersMock.mockResolvedValue({ items: [user], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
+    const actions = wrapper.get('.management-row-actions')
+    expect(actions.findAll('button')).toHaveLength(2)
+    const more = actions.get('button[aria-haspopup="menu"]')
+    expect(more.attributes('aria-label')).toContain('更多操作')
+    await more.trigger('click')
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull())
+    wrapper.unmount()
   })
 
   it('renders the no-permission state without requesting users', async () => {
@@ -445,10 +480,7 @@ describe('UsersView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '角色')
-      ?.trigger('click')
+    await clickRowAction(wrapper, '分配角色')
     await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith(user.tenant.id))
 
     const roleSelect = wrapper.findComponent('[data-test="user-role-select"]') as VueWrapper
@@ -475,10 +507,7 @@ describe('UsersView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '角色')
-      ?.trigger('click')
+    await clickRowAction(wrapper, '分配角色')
     await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledWith('1'))
 
     expect(wrapper.text()).toContain('平台审计员（系统）')
@@ -524,10 +553,7 @@ describe('UsersView', () => {
     await queryClient.invalidateQueries({ queryKey: ['tenants'] })
     await vi.waitFor(() => expect(listTenantOptionsMock).toHaveBeenCalledTimes(2))
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '角色')
-      ?.trigger('click')
+    await clickRowAction(wrapper, '分配角色')
     await vi.waitFor(() => expect(listRoleOptionsMock).toHaveBeenCalledTimes(1))
 
     await queryClient.invalidateQueries({ queryKey: ['roles'] })
@@ -606,10 +632,7 @@ describe('UsersView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '角色')
-      ?.trigger('click')
+    await clickRowAction(wrapper, '分配角色')
 
     const error = await vi.waitFor(() => {
       const node = wrapper.find('[data-test="user-role-options-error"]')
@@ -629,10 +652,7 @@ describe('UsersView', () => {
     const wrapper = mountView(queryClient)
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="users-table"]').exists()).toBe(true))
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '停用')
-      ?.trigger('click')
+    await clickRowAction(wrapper, '停用')
 
     await vi.waitFor(() =>
       expect(confirm).toHaveBeenCalledWith(
@@ -643,10 +663,7 @@ describe('UsersView', () => {
     )
     await vi.waitFor(() => expect(updateUserMock).toHaveBeenLastCalledWith(user.id, { status: 0 }))
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '删除')
-      ?.trigger('click')
+    await clickRowAction(wrapper, '删除')
     await vi.waitFor(() =>
       expect(confirm).toHaveBeenLastCalledWith(
         expect.stringContaining('删除后无法恢复'),

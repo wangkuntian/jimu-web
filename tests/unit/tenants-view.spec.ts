@@ -1,8 +1,8 @@
-import { mount } from '@vue/test-utils'
+import { mount, DOMWrapper } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus, { ElMessageBox } from 'element-plus'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import TenantsView from '../../src/features/tenants/views/TenantsView.vue'
@@ -46,7 +46,7 @@ const tenant = {
   code: 'default',
   name: '默认租户',
   status: 1,
-  plan_id: 0,
+  plan_id: '0',
   created_at: '2026-10-19T00:00:00Z',
   updated_at: '2026-10-19T00:00:00Z',
 }
@@ -101,7 +101,12 @@ const rowAdminIdentity: Identity = {
 const largeTenantId = '370528943163310080'
 
 function buttonByText(wrapper: ReturnType<typeof mountView>, text: string) {
-  return wrapper.findAll('button').find((button) => button.text() === text)
+  return (
+    wrapper.findAll('button').find((button) => button.text() === text) ??
+    [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .filter((element) => element.textContent?.trim() === text)
+      .map((element) => new DOMWrapper(element))[0]
+  )
 }
 
 /** 真实点击时 el-pagination 先发 update:current-page（v-model 写入），再发 current-change。 */
@@ -109,6 +114,27 @@ function emitPaginationPage(wrapper: ReturnType<typeof mountView>, page: number)
   const pagination = wrapper.findComponent('[data-test="tenants-pagination"]') as VueWrapper
   pagination.vm.$emit('update:current-page', page)
   pagination.vm.$emit('current-change', page)
+}
+
+const mountedWrappers: Array<{ unmount: () => void }> = []
+
+async function clickRowAction(wrapper: ReturnType<typeof mountView>, label: string): Promise<void> {
+  const direct = wrapper
+    .findAll('.management-row-actions button')
+    .find((button) => button.text() === label)
+  if (direct) {
+    await direct.trigger('click')
+    return
+  }
+  await wrapper.get('.management-row-actions button[aria-haspopup="menu"]').trigger('click')
+  const item = await vi.waitFor(() => {
+    const node = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (element) => element.textContent?.trim() === label,
+    )
+    expect(node).toBeDefined()
+    return node!
+  })
+  await new DOMWrapper(item).trigger('click')
 }
 
 function mountView(
@@ -121,20 +147,41 @@ function mountView(
       { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
     ],
   })
-  return mount(TenantsView, {
+  const wrapper = mount(TenantsView, {
+    attachTo: document.body,
     global: {
       plugins: [ElementPlus, router, [VueQueryPlugin, { queryClient }]],
     },
   })
+  mountedWrappers.push(wrapper)
+  return wrapper
 }
 
 describe('TenantsView', () => {
+  afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+  })
   beforeEach(() => {
     vi.clearAllMocks()
     ensureIdentityMock.mockReset()
     clearIdentity()
     listPlansMock.mockResolvedValue([])
     deleteTenantMock.mockResolvedValue()
+  })
+
+  it('keeps row actions compact and exposes a named overflow menu', async () => {
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({ items: [tenant], total: 1, page: 1, pageSize: 20 })
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    const actions = wrapper.get('.management-row-actions')
+    expect(actions.findAll('button')).toHaveLength(2)
+    const more = actions.get('button[aria-haspopup="menu"]')
+    expect(more.attributes('aria-label')).toContain('更多操作')
+    await more.trigger('click')
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull())
+    wrapper.unmount()
   })
 
   it('renders the no-permission state without issuing a request', async () => {
@@ -179,13 +226,13 @@ describe('TenantsView', () => {
   it('renders the table rows with the plan column mapped from plan_id', async () => {
     saveIdentity(adminIdentity)
     listTenantsMock.mockResolvedValue({
-      items: [{ ...tenant, plan_id: 2 }],
+      items: [{ ...tenant, plan_id: '2' }],
       total: 1,
       page: 1,
       pageSize: 20,
     })
     listPlansMock.mockResolvedValue([
-      { id: 2, code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
+      { id: '2', code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
     ])
     const wrapper = mountView()
 
@@ -196,10 +243,32 @@ describe('TenantsView', () => {
     expect(wrapper.text()).toContain('专业版')
   })
 
+  it('keeps a snowflake plan id unchanged when saving the selection', async () => {
+    const planId = '373398409660334080'
+    saveIdentity(rowAdminIdentity)
+    listTenantsMock.mockResolvedValue({
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: planId }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
+    listPlansMock.mockResolvedValue([
+      { id: planId, code: 'free', name: '免费版', max_users: 10, max_roles: 5, max_api_keys: 2 },
+    ])
+    assignTenantPlanMock.mockResolvedValue()
+    const wrapper = mountView()
+
+    await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
+    await clickRowAction(wrapper, '分配套餐')
+    await wrapper.find('[data-test="tenant-plan-submit"]').trigger('click')
+
+    await vi.waitFor(() => expect(assignTenantPlanMock).toHaveBeenCalledWith('2', planId))
+  })
+
   it('shows plan loading failures with request id and disables saving until retry succeeds', async () => {
     saveIdentity(rowAdminIdentity)
     listTenantsMock.mockResolvedValue({
-      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: 2 }],
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: '2' }],
       total: 1,
       page: 1,
       pageSize: 20,
@@ -207,12 +276,12 @@ describe('TenantsView', () => {
     listPlansMock
       .mockRejectedValueOnce(new ApiError(ErrorCode.internal, '套餐加载失败', 'req-plan-options'))
       .mockResolvedValueOnce([
-        { id: 2, code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
+        { id: '2', code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
       ])
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
-    await buttonByText(wrapper, '分配套餐')?.trigger('click')
+    await clickRowAction(wrapper, '分配套餐')
     const error = await vi.waitFor(() => {
       const node = wrapper.find('[data-test="tenant-plans-error"]')
       expect(node.exists()).toBe(true)
@@ -299,7 +368,7 @@ describe('TenantsView', () => {
     const wrapper = mountView(queryClient)
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
-    await buttonByText(wrapper, '删除')?.trigger('click')
+    await clickRowAction(wrapper, '删除')
 
     await vi.waitFor(() => expect(deleteTenantMock).toHaveBeenCalledWith('2'))
     await vi.waitFor(() => {
@@ -331,7 +400,7 @@ describe('TenantsView', () => {
   it('allows cancelling a plan from the PUT grant without listing plans', async () => {
     saveIdentity(planAssignerIdentity)
     listTenantsMock.mockResolvedValue({
-      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: 2 }],
+      items: [{ ...tenant, id: '2', code: 'acme', name: 'Acme', plan_id: '2' }],
       total: 1,
       page: 1,
       pageSize: 20,
@@ -340,19 +409,18 @@ describe('TenantsView', () => {
     const wrapper = mountView()
 
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
-    expect(wrapper.findAll('button').map((button) => button.text())).toContain('分配套餐')
     expect(listPlansMock).not.toHaveBeenCalled()
 
-    await buttonByText(wrapper, '分配套餐')?.trigger('click')
+    await clickRowAction(wrapper, '分配套餐')
     expect(wrapper.find('[data-test="tenant-plans-permission"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('当前套餐 #2')
 
     const planSelect = wrapper.findComponent('[data-test="tenant-plan-select"]') as VueWrapper
     expect((planSelect.props() as { disabled?: boolean }).disabled).toBe(false)
-    planSelect.vm.$emit('update:modelValue', 0)
+    planSelect.vm.$emit('update:modelValue', '0')
     await wrapper.find('[data-test="tenant-plan-submit"]').trigger('click')
 
-    await vi.waitFor(() => expect(assignTenantPlanMock).toHaveBeenCalledWith('2', 0))
+    await vi.waitFor(() => expect(assignTenantPlanMock).toHaveBeenCalledWith('2', '0'))
   })
 
   it('hides the edit and delete row actions without per-row PUT/DELETE permissions', async () => {
@@ -375,7 +443,10 @@ describe('TenantsView', () => {
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
     const labels = wrapper.findAll('button').map((button) => button.text())
     expect(labels).toContain('编辑')
-    expect(labels).toContain('删除')
+    await wrapper.get('.management-row-actions button[aria-haspopup="menu"]').trigger('click')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="menu"]')?.textContent).toContain('删除'),
+    )
   })
 
   it('renders the loading state while the list request is pending', async () => {
@@ -444,6 +515,8 @@ describe('TenantsView', () => {
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
     expect(wrapper.find('[data-test="tenants-imprecise-id"]').exists()).toBe(false)
 
+    await wrapper.get('.management-row-actions button[aria-haspopup="menu"]').trigger('click')
+    await vi.waitFor(() => expect(document.querySelector('[role="menuitem"]')).not.toBeNull())
     for (const label of ['编辑', '删除', '分配套餐']) {
       const button = buttonByText(wrapper, label)
       expect(button).toBeDefined()
@@ -459,6 +532,8 @@ describe('TenantsView', () => {
     await vi.waitFor(() => expect(wrapper.find('[data-test="tenants-table"]').exists()).toBe(true))
     expect(wrapper.find('[data-test="tenants-imprecise-id"]').exists()).toBe(false)
 
+    await wrapper.get('.management-row-actions button[aria-haspopup="menu"]').trigger('click')
+    await vi.waitFor(() => expect(document.querySelector('[role="menuitem"]')).not.toBeNull())
     for (const label of ['编辑', '删除', '分配套餐']) {
       const button = buttonByText(wrapper, label)
       expect(button).toBeDefined()

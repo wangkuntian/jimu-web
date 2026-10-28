@@ -13,7 +13,7 @@ const tenant = {
   code: 'default',
   name: '默认租户',
   status: 1,
-  plan_id: 2,
+  plan_id: '2',
   created_at: '2026-10-19T00:00:00Z',
   updated_at: '2026-10-19T00:00:00Z',
 }
@@ -55,7 +55,7 @@ test('signs in and lists real tenants for a platform admin', async ({ page }) =>
         code: 0,
         message: 'ok',
         data: [
-          { id: 2, code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
+          { id: '2', code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
         ],
         total: 1,
         page: 1,
@@ -121,7 +121,7 @@ test('shows plan loading failures and enables saving only after a successful ret
         code: 0,
         message: 'ok',
         data: [
-          { id: 2, code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
+          { id: '2', code: 'pro', name: '专业版', max_users: 50, max_roles: 20, max_api_keys: 10 },
         ],
         total: 1,
         page: 1,
@@ -133,7 +133,8 @@ test('shows plan loading failures and enables saving only after a successful ret
   await seedSession(page, ADMIN_IDENTITY)
   await page.goto('/admin/tenants')
   await expect(page.getByTestId('tenants-table')).toContainText('默认租户')
-  await page.getByRole('button', { name: '分配套餐' }).click()
+  await page.getByRole('button', { name: '默认租户的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '分配套餐', exact: true }).click()
 
   const dialog = page.locator('.el-dialog').filter({ hasText: '分配套餐' })
   await expect(page.getByTestId('tenant-plans-error')).toContainText('套餐加载失败')
@@ -145,6 +146,59 @@ test('shows plan loading failures and enables saving only after a successful ret
   await expect(page.getByTestId('tenant-plan-submit')).toBeEnabled()
   await dialog.locator('.el-select__wrapper').click()
   await expect(page.getByRole('option', { name: '专业版', exact: true })).toBeVisible()
+})
+
+test('sends a snowflake plan id without numeric precision loss', async ({ page }) => {
+  const planId = '373398409660334080'
+  let payload: unknown
+  await page.route(/\/api\/v1\/tenants(\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        message: 'ok',
+        data: [tenant],
+        total: 1,
+        page: 1,
+        page_size: 20,
+      },
+    }),
+  )
+  await page.route(/\/api\/v1\/tenant-plans(\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        message: 'ok',
+        data: [
+          {
+            id: planId,
+            code: 'free',
+            name: '免费版',
+            max_users: 10,
+            max_roles: 5,
+            max_api_keys: 2,
+          },
+        ],
+        total: 1,
+        page: 1,
+        page_size: 100,
+      },
+    }),
+  )
+  await page.route('**/api/v1/tenants/*/plan', async (route) => {
+    payload = route.request().postDataJSON()
+    await route.fulfill({ json: { code: 0, message: 'ok' } })
+  })
+
+  await seedSession(page, ADMIN_IDENTITY)
+  await page.goto('/admin/tenants')
+  await page.getByRole('button', { name: '默认租户的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '分配套餐', exact: true }).click()
+  await page.getByTestId('tenant-plan-select').click()
+  await page.getByRole('option', { name: '免费版', exact: true }).click()
+  await page.getByTestId('tenant-plan-submit').click()
+
+  await expect(page.getByText('套餐已更新')).toBeVisible()
+  expect(payload).toEqual({ plan_id: planId })
 })
 
 test('renders the no-permission page for a user manager without tenant access', async ({

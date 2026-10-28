@@ -34,7 +34,7 @@ const tenants = {
       code: 'default',
       name: '默认租户',
       status: 1,
-      plan_id: 0,
+      plan_id: '0',
       created_at: '',
       updated_at: '',
     },
@@ -189,7 +189,8 @@ test('manages roles with the shared admin page and replaces permissions', async 
   await expect(readOnlyDrawer.getByRole('button', { name: '保存权限' })).toHaveCount(0)
   await readOnlyDrawer.getByRole('button', { name: '关闭' }).click()
 
-  await customRow.getByRole('button', { name: '停用' }).click()
+  await customRow.getByRole('button', { name: '运营管理员的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '停用', exact: true }).click()
   await page.locator('.el-message-box').getByRole('button', { name: '停用' }).click()
   await expect
     .poll(() => updatePayload)
@@ -199,7 +200,8 @@ test('manages roles with the shared admin page and replaces permissions', async 
       status: 0,
     })
 
-  await customRow.getByRole('button', { name: '删除' }).click()
+  await customRow.getByRole('button', { name: '运营管理员的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '删除', exact: true }).click()
   await page.locator('.el-message-box').getByRole('button', { name: '删除' }).click()
   await expect.poll(() => deletePayload).toBe(role.id)
 })
