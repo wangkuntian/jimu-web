@@ -22,9 +22,9 @@
     "check": "pnpm run api:check && pnpm run fmt:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "dependencies": {
-    "@lucide/vue": "^1.47.0",
+    "@lucide/vue": "^1.61.0",
     "@tanstack/vue-query": "^5.104.1",
-    "element-plus": "^2.14.6",
+    "element-plus": "^2.14.7",
     "openapi-fetch": "^0.17.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.42",
