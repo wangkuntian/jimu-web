@@ -1,9 +1,9 @@
 version: 2
 updates:
-  # npm 依赖：先按家族分组（同族通常要一起动），再用兜底组收长尾 minor/patch。
+  # Bun 依赖：先按家族分组（同族通常要一起动），再用兜底组收长尾 minor/patch。
   # Dependabot 把依赖分配给「第一个匹配的组」，所以家族组必须排在兜底组之前。
   # 不设自动合并：本仓的 CI Gate 是唯一门禁，依赖升级一律人工确认。
-  - package-ecosystem: 'npm'
+  - package-ecosystem: 'bun'
     directory: '/'
     schedule:
       interval: 'weekly'
@@ -13,7 +13,7 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - 'dependencies'
-      - 'npm'
+      - 'bun'
     commit-message:
       prefix: 'chore'
       include: 'scope'

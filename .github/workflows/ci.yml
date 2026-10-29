@@ -122,24 +122,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # engines: >=22.13.0 —— pnpm 11.23.0 自身要求 Node >=22.13（用到 node:sqlite），
-        # 所以没有 node 20 这一档：它在 setup 阶段就会因 pnpm 无法启动而失败
+        # engines: >=22.13.0；矩阵覆盖声明的 Node 22 / 24 运行时范围
         node: ['22', '24']
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run fmt:check
-      - run: pnpm run lint
-      - run: pnpm run typecheck
-      - run: pnpm run test
+      - run: bun install --frozen-lockfile
+      - run: bun run fmt:check
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
 
   # ── 契约层：重新生成派生文件，确认与提交内容一致 ────────────────────────────────
   api:
@@ -151,17 +149,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       # api:check 重新生成 contracts/jimu.openapi.yaml 与 src/shared/api/generated.ts，
       # 再用 git diff --exit-code 判定是否与提交内容一致。
-      - run: pnpm run api:check
+      - run: bun run api:check
       # pin 校验：读 contracts/backend-commit.txt → 公开仓 fetch 该 SHA → 逐字节比对契约副本。
       # 只读、零凭据、fail-closed：pin 未推送时 fetch 直接失败。
       - run: bash scripts/check_contract_pin.sh
@@ -176,15 +173,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - run: bun install --frozen-lockfile
+      - run: bun run build
 
       - name: '📤 Upload the build output'
         uses: actions/upload-artifact@v7
@@ -204,16 +200,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run test:e2e
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
 
       - name: '📤 Upload the Playwright report'
         if: failure()

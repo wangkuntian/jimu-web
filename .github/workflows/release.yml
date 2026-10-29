@@ -44,14 +44,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
 
       - name: Require the release notes file
         run: |
@@ -63,7 +62,7 @@ jobs:
           fi
           echo "found $notes"
 
-      - run: pnpm run build
+      - run: bun run build
 
       - name: '📦 Package the static assets'
         run: |

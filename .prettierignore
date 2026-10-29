@@ -6,8 +6,7 @@ test-results/
 .vitest/
 .cache/
 .codebase-memory/
-.pnpm-store/
-pnpm-lock.yaml
+bun.lock
 contracts/jimu.swagger.yaml
 contracts/jimu.openapi.yaml
 src/shared/api/generated.ts
