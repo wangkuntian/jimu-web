@@ -23,17 +23,17 @@ Jimu Hub 是 Jimu 后端配套的独立前端项目，目标是为平台管理�
 
 ## 前置条件
 
-- Node.js 22.13+（`package.json` 的 `engines`；pnpm 11 自身要求 Node ≥22.13）
-- pnpm 11.23.0（由 `packageManager` 固定）
+- Node.js 22.13+（`package.json` 的 `engines`；Node 继续作为 Vite、Vitest 与 Playwright 的运行时）
+- Bun 1.4.3（由 `packageManager` 固定，负责依赖安装与脚本调度）
 - 可选：运行 E2E 测试时安装 Playwright Chromium 浏览器
 - 本地 API 开发需要另行运行 `jimu` 后端，默认地址为 `http://localhost:8080`
 
 ## 快速开始
 
 ```bash
-pnpm install
-pnpm run api:types
-pnpm run dev
+bun install
+bun run api:types
+bun run dev
 ```
 
 开发服务器启动后访问 `http://localhost:5173`。Vite 会将 `/api` 请求代理到本地 Jimu 后端。
@@ -57,7 +57,7 @@ make compose-up                              # 启动 compose 栈，server 在 1
 make compose-migrate                         # 首次运行、库表还没建时必须先迁移
 make compose-seed ADMIN_PASSWORD=Admin12345  # 结构种子：默认租户 + free 套餐 + 权限点 + 超级管理员角色 + admin
 cd -
-pnpm run dev                                 # 开发服务器 http://localhost:5173
+bun run dev                                 # 开发服务器 http://localhost:5173
 ```
 
 `make compose-seed` 是幂等的，但**只在 `admin` 不存在时建号**：`admin` 已存在时它不会覆盖密码。此时要么用建号时的那个密码，要么删掉该账号后重新 seed。另外 `ADMIN_PASSWORD` 必须满足登录接口的校验 `min=8,max=32`，超长密码建出来的账号无法通过 `POST /auth/login`（返回 `1001 参数错误`）。
@@ -73,35 +73,35 @@ pnpm run dev                                 # 开发服务器 http://localhost:
 ### 可复现的端到端
 
 ```bash
-E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 pnpm exec playwright test e2e/real-backend.spec.ts
+E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 bunx playwright test e2e/real-backend.spec.ts
 ```
 
 `e2e/real-backend.spec.ts` 由 `E2E_REAL_BACKEND=1` 门控，默认跳过（CI 上没有后端）。两条用例均启用：一条真实注册 `e2e_<时间戳>` 账号，验证零角色进入用户工作区且访问管理面会被送回，再用 `admin` 确认租户列表渲染出真实的 `default` 行；另一条走「新建 → 分配套餐 → 删除」，使用新的字符串 ID 契约验证完整链路。
 
 ## CLI 命令
 
-| 命令                     | 用途                                                         |
-| ------------------------ | ------------------------------------------------------------ |
-| `pnpm run dev`           | 启动 Vite 开发服务器                                         |
-| `pnpm run fmt`           | 使用 Prettier 格式化文件                                     |
-| `pnpm run fmt:check`     | 检查格式但不修改文件                                         |
-| `pnpm run lint`          | 运行 ESLint                                                  |
-| `pnpm run typecheck`     | 运行 Vue TypeScript 类型检查                                 |
-| `pnpm run test`          | 运行 Vitest 单元测试                                         |
-| `pnpm run test:watch`    | 以监听模式运行 Vitest                                        |
-| `pnpm run test:e2e`      | 运行 Playwright 端到端测试                                   |
-| `pnpm run api:convert`   | 将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0                  |
-| `pnpm run api:types`     | 从 OpenAPI 契约生成 TypeScript 类型                          |
-| `pnpm run api:check`     | 检查 OpenAPI 与 TypeScript 派生文件是否同步                  |
-| `pnpm run hooks:install` | 安装 commit-msg 钩子（`git config core.hooksPath githooks`） |
-| `pnpm run build`         | 执行类型检查并构建生产资源                                   |
-| `pnpm run preview`       | 预览生产构建                                                 |
-| `pnpm run check`         | 运行 API、格式、lint、类型、单测和构建检查                   |
+| 命令                    | 用途                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| `bun run dev`           | 启动 Vite 开发服务器                                         |
+| `bun run fmt`           | 使用 Prettier 格式化文件                                     |
+| `bun run fmt:check`     | 检查格式但不修改文件                                         |
+| `bun run lint`          | 运行 ESLint                                                  |
+| `bun run typecheck`     | 运行 Vue TypeScript 类型检查                                 |
+| `bun run test`          | 运行 Vitest 单元测试                                         |
+| `bun run test:watch`    | 以监听模式运行 Vitest                                        |
+| `bun run test:e2e`      | 运行 Playwright 端到端测试                                   |
+| `bun run api:convert`   | 将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0                  |
+| `bun run api:types`     | 从 OpenAPI 契约生成 TypeScript 类型                          |
+| `bun run api:check`     | 检查 OpenAPI 与 TypeScript 派生文件是否同步                  |
+| `bun run hooks:install` | 安装 commit-msg 钩子（`git config core.hooksPath githooks`） |
+| `bun run build`         | 执行类型检查并构建生产资源                                   |
+| `bun run preview`       | 预览生产构建                                                 |
+| `bun run check`         | 运行 API、格式、lint、类型、单测和构建检查                   |
 
 提交前至少运行：
 
 ```bash
-pnpm run check
+bun run check
 ```
 
 ## 开发流程
@@ -109,7 +109,7 @@ pnpm run check
 分支、提交消息、PR、CI 与发布的完整约定见[贡献指南](docs/CONTRIBUTING.md)。要点：
 
 - `master` 有分支保护（规则集 `protect master`）：只能经 PR 合入，required check 是聚合检查 `CI Gate`，禁止强推与删除分支。
-- 提交消息使用 Conventional Commits `type(scope): summary`；`pnpm run hooks:install` 启用本地钩子，CI 的 `Policy` job 兜底。
+- 提交消息使用 Conventional Commits `type(scope): summary`；`bun run hooks:install` 启用本地钩子，CI 的 `Policy` job 兜底。
 - 改动产品代码（`src/`、`index.html`、`package.json`）的 PR 必须同步更新 `docs/releases/v<version>.md`。
 - 纯文档 PR 只跑 `Policy` 与 `CI Gate`，其余 job 显式跳过。
 - 依赖更新由 dependabot 每周开 PR，不自动合并。
@@ -125,15 +125,15 @@ scripts/sync-contract.sh                  # 取本地 ../jimu 的 HEAD（提交�
 scripts/sync-contract.sh <sha|tag|branch> # 从公开远端 fetch --depth=1 取该提交
 ```
 
-脚本写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，随后自动运行 `pnpm run api:types`。取「提交态」而不是工作区文件：后端仓库里未提交的本地改动不应该进契约副本；pin 也必须是**已推送**的提交，否则 CI 的 pin 校验会失败。`pnpm run api:convert` 只生成 `contracts/jimu.openapi.yaml`；通常直接运行 `pnpm run api:types`，它会先转换再生成 TypeScript 类型：
+脚本写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，随后自动运行 `bun run api:types`。取「提交态」而不是工作区文件：后端仓库里未提交的本地改动不应该进契约副本；pin 也必须是**已推送**的提交，否则 CI 的 pin 校验会失败。`bun run api:convert` 只生成 `contracts/jimu.openapi.yaml`；通常直接运行 `bun run api:types`，它会先转换再生成 TypeScript 类型：
 
 ```bash
-pnpm run api:types
+bun run api:types
 ```
 
 生成文件 `src/shared/api/generated.ts` 只包含派生类型，不在其中添加手写业务逻辑。
 
-CI 的 `API Contract` job 除 `pnpm run api:check` 外还运行 `scripts/check_contract_pin.sh`：它从公开仓 `fetch --depth=1` 取 pin 的 SHA，再与 `contracts/jimu.swagger.yaml` 逐字节比对。这一步只读、零凭据、fail-closed——pin 未推送时 fetch 直接失败，契约副本无法悄悄偏离来源提交。
+CI 的 `API Contract` job 除 `bun run api:check` 外还运行 `scripts/check_contract_pin.sh`：它从公开仓 `fetch --depth=1` 取 pin 的 SHA，再与 `contracts/jimu.swagger.yaml` 逐字节比对。这一步只读、零凭据、fail-closed——pin 未推送时 fetch 直接失败，契约副本无法悄悄偏离来源提交。
 
 后端 `/api/v1/admin/error-codes` 与 `/api/v1/admin/ratelimit/auth` 的重复 `basePath` 前缀已修正，生成路径不再重复 `/api/v1`；但这两条 console 能力尚未接通认证链，运行时仍返回 401，前端不消费。
 
@@ -208,7 +208,7 @@ jimu-web/
 - Playwright 覆盖 `/hub` 分流与最近工作台恢复、管理面越权回退、旧路由重定向、管理员工作概览、用户工作区、可展开/收起且权限驱动的侧边栏、822px 双栏与窄屏单列布局，以及 Carbon 设计 token 是否按预期覆盖 Element Plus 默认值。
 - Playwright 另覆盖：认证页品牌与表单状态、窄屏布局、未登录访问受保护路由的重定向与登录后回跳、按错误码揭示 TOTP 字段、凭据被拒时的错误提示、租户列表渲染、套餐加载失败与重试、用户列表与创建/编辑/角色/停用交互、active-only 租户创建选项、角色列表与权限分组分配，以及无权限（本地缺权限与后端 `403` 两种来源）渲染无权限页且留在当前页面。
 - 真机链路（真实后端）由 `E2E_REAL_BACKEND=1` 门控，见「本地真机联调」；默认不跑也不需要在 CI 上跑。
-- `pnpm run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
+- `bun run check` 是本地质量门禁；CI 把它拆成 `Quality & Tests`（node 22/24 矩阵）、`API Contract`、`Build` 三个并行 job，E2E 单列，最后由聚合检查 `CI Gate` 收口。
 
 ## 相关文档
 

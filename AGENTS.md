@@ -7,7 +7,7 @@
 ## 仓库边界
 
 - 本仓库名为 `jimu-web`，产品名为 `Jimu Hub`。
-- 唯一包管理器为 `pnpm@11.23.0`；不生成或提交 npm、Yarn lockfile。
+- 唯一包管理器为 `bun@1.4.3`；提交 `bun.lock`，不生成或提交 npm、Yarn、pnpm lockfile。
 - 不直接修改后端仓库（本地默认位于 `../jimu`）；后端变更应在后端仓库中完成。
 - 前后端通过 `contracts/jimu.swagger.yaml`、`contracts/jimu.openapi.yaml` 和 `contracts/backend-commit.txt` 关联。
 - 不在前端复制后端领域规则或自行伪造租户标识。
@@ -23,10 +23,10 @@
 - 项目定位、技术栈、CLI 命令、目录结构和 OpenAPI 流程见 [README.md](README.md)；前端设计方向见 [Jimu Hub 前端设计（原 Jimu Portal 文档）](docs/superpowers/specs/2026-09-20-jimu-portal-design.md)。
 - 设计 token、色板来源与 UI 规范见 [DESIGN.md](DESIGN.md)；选型理由与被否决的候选见[设计系统来源与 UI 规范](docs/superpowers/specs/2026-10-10-jimu-portal-design-system.md)。
 - 与 `jimu` 的跨仓任务必须先读[跨仓协作工作流](https://github.com/wangkuntian/jimu/blob/master/docs/design/cross-repo-development.md)（本地为 `../jimu/docs/design/cross-repo-development.md`），按其中任务模板和契约顺序执行。
-- 分支、PR、CI、发布与版本日志流程见 [贡献指南](docs/CONTRIBUTING.md)；首次克隆后运行 `pnpm run hooks:install` 启用 commit-msg 钩子。
+- 分支、PR、CI、发布与版本日志流程见 [贡献指南](docs/CONTRIBUTING.md)；首次克隆后运行 `bun run hooks:install` 启用 commit-msg 钩子。
 - 修改代码、脚本或目录约定后，必须同步更新 README.md 对应章节。
 - 分支名沿用后端约定：`feature/<issue>-<slug>`，全小写短横线格式；`master` 有分支保护（`protect master`），只能经 PR 合入。
-- 契约变更流程：替换 `contracts/jimu.swagger.yaml` → 更新 `contracts/backend-commit.txt` → 运行 `pnpm run api:types`。
+- 契约变更流程：替换 `contracts/jimu.swagger.yaml` → 更新 `contracts/backend-commit.txt` → 运行 `bun run api:types`。
 - 需要后端领域规则（错误码分段、响应结构、归属模型、套餐与配额上限等）时查阅 `jimu` 仓库文档，不在本仓库复述。
 
 ## 架构约束
@@ -34,7 +34,7 @@
 - 后端 HTTP 路由统一在 `/api/v1` 前缀下；身份与租户上下文由后端依据已验签凭证（JWT / API Key）解析，前端不参与解析。
 - 前端不传租户标识（header、query、请求体都不传），不伪造、不推导、不缓存租户归属；租户范围与权限判定以服务端返回为准。
 - 按用户能力组织界面：具体业务域确定后再建 `src/features/<domain>/`；`src/shared/` 只放确实被多个能力复用的内容。
-- `src/shared/api/generated.ts` 由 `pnpm run api:types` 派生，是只读产物，不在其中添加手写业务逻辑。
+- `src/shared/api/generated.ts` 由 `bun run api:types` 派生，是只读产物，不在其中添加手写业务逻辑。
 - 首版只覆盖已确认的管理能力和通用工作区壳，不预先实现具体业务域，不虚构订单、库存、项目等业务。
 
 ## 设计系统
@@ -72,15 +72,15 @@
 - summary 与正文全部使用英文：小写开头、祈使句、不加句号；不使用 `update code`、`fix bug` 这类无信息量 summary。
 - 一个 commit 只包含一个清晰主题。
 
-与后端仓库保持同一约定。由 `githooks/commit-msg` 强制检查（`pnpm run hooks:install` 安装，确需跳过用 `git commit --no-verify`），CI 的 `Policy` job 兜底。
+与后端仓库保持同一约定。由 `githooks/commit-msg` 强制检查（`bun run hooks:install` 安装，确需跳过用 `git commit --no-verify`），CI 的 `Policy` job 兜底。
 
 ## 质量门禁
 
 - 代码改动先写聚焦测试，并先观察测试失败，再实现最小行为。
-- 提交前运行 `pnpm run check`；它等价于 CI 的 `Quality & Tests` + `API Contract` + `Build`，`E2E` 用 `pnpm run test:e2e`。
+- 提交前运行 `bun run check`；它等价于 CI 的 `Quality & Tests` + `API Contract` + `Build`，`E2E` 用 `bun run test:e2e`。
 - 改动产品代码（`src/`、`index.html`、`package.json`）时同步更新 `docs/releases/v<version>.md`，否则 CI 的 `Policy` job 失败。
-- 修改 Swagger 契约时同步更新 `contracts/backend-commit.txt`，再运行 `pnpm run api:types`。
-- 只改文档时至少运行 `pnpm exec prettier --check <file>`。
+- 修改 Swagger 契约时同步更新 `contracts/backend-commit.txt`，再运行 `bun run api:types`。
+- 只改文档时至少运行 `bunx prettier --check <file>`。
 - 修改 workflow 时确认 `scripts/check_ci_gate.sh` 的 job 清单与适用标记同步更新（漏一个会让门禁静默失效）。
 - 修改脚本、工具或目录约定时同步更新 `README.md`。
 
@@ -94,19 +94,19 @@
 
 ## CLI 命令
 
-- `pnpm run dev`：启动开发服务器。
-- `pnpm run fmt`：格式化源码。
-- `pnpm run fmt:check`：检查格式但不修改文件。
-- `pnpm run lint`：运行 ESLint。
-- `pnpm run typecheck`：运行 `vue-tsc`。
-- `pnpm run test`：运行 Vitest。
-- `pnpm run test:e2e`：运行 Playwright。
-- `pnpm run api:convert`：将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0。
-- `pnpm run api:types`：先转换契约，再生成 TypeScript 类型。
-- `pnpm run api:check`：重新生成 API 派生文件并检查是否存在未同步差异。
-- `pnpm run hooks:install`：将 `core.hooksPath` 指向 `githooks/`，启用 commit-msg 校验。
-- `pnpm run build`：构建生产资源。
-- `pnpm run check`：运行 API、格式、lint、类型、单测和构建检查。
+- `bun run dev`：启动开发服务器。
+- `bun run fmt`：格式化源码。
+- `bun run fmt:check`：检查格式但不修改文件。
+- `bun run lint`：运行 ESLint。
+- `bun run typecheck`：运行 `vue-tsc`。
+- `bun run test`：运行 Vitest。
+- `bun run test:e2e`：运行 Playwright。
+- `bun run api:convert`：将固定的 Swagger 2.0 契约转换为 OpenAPI 3.0。
+- `bun run api:types`：先转换契约，再生成 TypeScript 类型。
+- `bun run api:check`：重新生成 API 派生文件并检查是否存在未同步差异。
+- `bun run hooks:install`：将 `core.hooksPath` 指向 `githooks/`，启用 commit-msg 校验。
+- `bun run build`：构建生产资源。
+- `bun run check`：运行 API、格式、lint、类型、单测和构建检查。
 
 ## 回复格式
 

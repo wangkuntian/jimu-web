@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 /**
  * 真机联调：要求 ../jimu 的 compose 栈跑在 127.0.0.1:8080，并已完成结构种子。
  * 默认跳过（CI 上没有后端），本地用：
- *   E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 pnpm exec playwright test e2e/real-backend.spec.ts
+ *   E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 bunx playwright test e2e/real-backend.spec.ts
  */
 test.skip(process.env.E2E_REAL_BACKEND !== '1', '需要真实后端，见 README 的「本地真机联调」')
 

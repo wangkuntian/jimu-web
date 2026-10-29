@@ -2,7 +2,7 @@
   "name": "jimu-web",
   "version": "0.3.0",
   "private": true,
-  "packageManager": "pnpm@11.23.0",
+  "packageManager": "bun@1.4.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,10 +16,10 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "api:convert": "swagger2openapi contracts/jimu.swagger.yaml -o contracts/jimu.openapi.yaml --yaml --patch",
-    "api:types": "pnpm run api:convert && openapi-typescript contracts/jimu.openapi.yaml -o src/shared/api/generated.ts",
-    "api:check": "pnpm run api:types && git diff --exit-code -- contracts/jimu.openapi.yaml src/shared/api/generated.ts",
+    "api:types": "bun run api:convert && openapi-typescript contracts/jimu.openapi.yaml -o src/shared/api/generated.ts",
+    "api:check": "bun run api:types && git diff --exit-code -- contracts/jimu.openapi.yaml src/shared/api/generated.ts",
     "hooks:install": "git config core.hooksPath githooks",
-    "check": "pnpm run api:check && pnpm run fmt:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
+    "check": "bun run api:check && bun run fmt:check && bun run lint && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
     "@lucide/vue": "^1.47.0",
@@ -55,6 +55,9 @@
     "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.12"
   },
+  "trustedDependencies": [
+    "vue-demi"
+  ],
   "engines": {
     "node": ">=22.13.0"
   }

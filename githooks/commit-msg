@@ -10,7 +10,7 @@
 #
 # 单一实现：scripts/check_commit_messages.sh 与 CI 的 Policy job 都调用本文件，
 # 避免本地钩子与 CI 判定漂移（后端的 commit-msg 只拦中日韩字符，本仓额外校验 type(scope)）。
-# 安装：pnpm run hooks:install（即 git config core.hooksPath githooks）
+# 安装：bun run hooks:install（即 git config core.hooksPath githooks）
 # 临时跳过：git commit --no-verify
 set -eu
 

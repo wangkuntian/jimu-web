@@ -59,4 +59,4 @@ staged_swagger=""
 printf '%s\n' "$sha" > "$repo_root/contracts/backend-commit.txt"
 
 echo "✅ 已固定 jimu@$sha"
-( cd "$repo_root" && pnpm run api:types )
+( cd "$repo_root" && bun run api:types )

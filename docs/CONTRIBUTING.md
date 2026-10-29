@@ -4,16 +4,16 @@
 
 ## 开发环境
 
-- Node.js `>=22.13.0`（`package.json` 的 `engines`；pnpm 11 自身要求 Node ≥22.13，Node 20 无法安装依赖）
-- pnpm 11.23.0（由 `packageManager` 固定，唯一包管理器）
+- Node.js `>=22.13.0`（`package.json` 的 `engines`；Node 继续作为 Vite、Vitest 与 Playwright 的运行时）
+- Bun 1.4.3（由 `packageManager` 固定，唯一包管理器，负责依赖安装与脚本调度）
 - 可选：本地运行 E2E 时安装 Playwright Chromium
 - 可选：本地联调需要后端 `jimu` 运行在 `http://localhost:8080`
 
 ```bash
-pnpm install
-pnpm run hooks:install   # git config core.hooksPath githooks，启用 commit-msg 校验
-pnpm run api:types       # 从固定契约生成 API 类型
-pnpm run dev             # http://localhost:5173，/api 代理到本地后端
+bun install
+bun run hooks:install   # git config core.hooksPath githooks，启用 commit-msg 校验
+bun run api:types       # 从固定契约生成 API 类型
+bun run dev             # http://localhost:5173，/api 代理到本地后端
 ```
 
 ## 跨仓协作
@@ -68,7 +68,7 @@ feat(portal): add a tenant switcher to the portal header
 fix(auth): reject an expired refresh token
 ```
 
-由 `githooks/commit-msg` 强制检查（`pnpm run hooks:install` 安装；确需跳过用 `git commit --no-verify`），CI 的 `Policy` job 兜底。本地自查整段分支：
+由 `githooks/commit-msg` 强制检查（`bun run hooks:install` 安装；确需跳过用 `git commit --no-verify`），CI 的 `Policy` job 兜底。本地自查整段分支：
 
 ```bash
 bash scripts/check_commit_messages.sh origin/master HEAD
@@ -116,7 +116,7 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 
 - 发布在 `master` tip 打 `vMAJOR.MINOR.PATCH` tag（SemVer，无预发布标签）
 - 若本版本走了 `release/<version>` 集成分支，顺序是：该分支合入 `master` → 确认 `master` tip 通过 `CI Gate` → 在 `master` tip 打 tag；**不在集成分支上打 tag**
-- `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`pnpm run build`、打包 `jimu-hub-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
+- `.github/workflows/release.yml` 由 tag 触发，分三段：`Verify Tag`（tag 必须指向当前 `master` tip）→ `Build`（要求 `docs/releases/<tag>.md` 存在、`bun run build`、打包 `jimu-hub-<tag>.tar.gz`）→ `Publish Release`（以版本文件为 Release body 创建 GitHub Release）
 - 发布产物是静态资源包，解压后的内容即站点根目录，由 Nginx/CDN 等静态托管
 - 回滚：`master` 不允许强推，用 revert commit 走正常 PR；已发布的 tag 不重打，改版本号重新发布
 
@@ -165,29 +165,29 @@ bash scripts/check_ci_gate.sh "CI Gate" success "Policy=success=true" "Build=ski
 - 版本号使用 SemVer：`vMAJOR.MINOR.PATCH`
 - 条目使用中文，面向使用者说明结果，不写内部流水账
 - 没有内容的分类可以省略，但 `亮点`、`验证`、`说明` 必须保留
-- `验证` 必须写真实跑过的命令与结果（如 `pnpm run check`、`pnpm run test:e2e`、CI run 链接），无法运行时明确说明原因
+- `验证` 必须写真实跑过的命令与结果（如 `bun run check`、`bun run test:e2e`、CI run 链接），无法运行时明确说明原因
 
 ## 代码规范
 
 - 界面按用户能力组织：具体业务域确定后再建 `src/features/<domain>/`，`src/shared/` 只放确实被多个能力复用的内容
 - 不在前端复制后端领域规则（错误码分段、归属模型、套餐与配额上限）；需要时查 `jimu` 仓库文档
 - 不传租户标识（header、query、请求体都不传），租户范围与权限判定以服务端返回为准
-- `src/shared/api/generated.ts` 是 `pnpm run api:types` 的派生产物，只读，不手写业务逻辑
+- `src/shared/api/generated.ts` 是 `bun run api:types` 的派生产物，只读，不手写业务逻辑
 - 契约变更流程：运行 `scripts/sync-contract.sh [<ref>]`（写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，并重新生成类型）→ 提交派生文件；CI 用 `scripts/check_contract_pin.sh` 去公开仓取证并逐字节校验 pin
 - 修改脚本、工具或目录约定后，同步更新 [README.md](../README.md)
 
 提交前至少运行：
 
 ```bash
-pnpm run check
+bun run check
 ```
 
 ## 测试
 
 ```bash
-pnpm run test        # Vitest 单元测试
-pnpm run test:watch  # 监听模式
-pnpm run test:e2e    # Playwright（首次需 pnpm exec playwright install chromium）
+bun run test        # Vitest 单元测试
+bun run test:watch  # 监听模式
+bun run test:e2e    # Playwright（首次需 bunx playwright install chromium）
 ```
 
 - 代码改动先写聚焦测试，并先观察测试失败，再实现最小行为
@@ -195,7 +195,7 @@ pnpm run test:e2e    # Playwright（首次需 pnpm exec playwright install chrom
 
 ## 依赖更新
 
-dependabot 每周一 09:00（Asia/Shanghai）对 npm 与 GitHub Actions 各开一组 PR：同族依赖合并成一个 PR，其余 minor/patch 归入兜底组，major 单独开。配置见 [`.github/dependabot.yml`](../.github/dependabot.yml)。
+dependabot 每周一 09:00（Asia/Shanghai）对 Bun 与 GitHub Actions 各开一组 PR：同族依赖合并成一个 PR，其余 minor/patch 归入兜底组，major 单独开。配置见 [`.github/dependabot.yml`](../.github/dependabot.yml)。
 
 - dependabot PR 跳过 commit message 与版本日志检查（其余门禁照跑）；豁免按 **PR 作者**判定，所以维护者在 PR 页面点 `Update branch` 同步依赖分支不会让这两个检查误触发
 - 需要同步依赖 PR 时优先点 `Update branch`（或评论 `@dependabot rebase`）；分支保护是 `strict`，PR 必须与 `master` 同步后才能合并
