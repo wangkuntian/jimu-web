@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.47.0",
-    "@tanstack/vue-query": "^5.104.5",
+    "@tanstack/vue-query": "^5.105.0",
     "element-plus": "^2.14.6",
     "openapi-fetch": "^0.17.0",
     "pinia": "^4.1.0",
