@@ -5,9 +5,9 @@
     "": {
       "name": "jimu-web",
       "dependencies": {
-        "@lucide/vue": "^1.47.0",
+        "@lucide/vue": "^1.64.0",
         "@tanstack/vue-query": "^5.104.5",
-        "element-plus": "^2.14.6",
+        "element-plus": "^2.14.7",
         "openapi-fetch": "^0.17.0",
         "pinia": "^4.1.0",
         "vue": "^3.5.44",
@@ -128,7 +128,7 @@
 
     "@keyv/serialize": ["@keyv/serialize@1.1.1", "https://registry.npmmirror.com/@keyv/serialize/-/serialize-1.1.1.tgz", {}, "sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA=="],
 
-    "@lucide/vue": ["@lucide/vue@1.47.0", "https://registry.npmmirror.com/@lucide/vue/-/vue-1.47.0.tgz", { "peerDependencies": { "vue": ">=3.0.1" } }, "sha512-S0/UX9zra4Z8xmqrA1MH5GiSKA8daAPFwkmORt/u+gUHAkYZoeOcr+DH3scZeyE9bdLWScGK+MJoDYi8rIU5Jg=="],
+    "@lucide/vue": ["@lucide/vue@1.64.0", "", { "peerDependencies": { "vue": ">=3.0.1" } }, "sha512-9Ta6cbHDk49GgKkSQRRVm55Cb99lou++5p4RNzUkS2NvOqD0RlWTEvidWgKMURUkfyz+3J6eeQz7tzCj3PJ0zA=="],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "https://registry.npmmirror.com/@nodelib/fs.scandir/-/fs.scandir-2.1.5.tgz", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "1.2.0" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 
@@ -372,7 +372,7 @@
 
     "editorconfig": ["editorconfig@3.0.2", "https://registry.npmmirror.com/editorconfig/-/editorconfig-3.0.2.tgz", { "dependencies": { "@one-ini/wasm": "0.2.1", "commander": "14.0.3", "minimatch": "10.2.6", "semver": "7.8.5" }, "bin": { "editorconfig": "bin/editorconfig" } }, "sha512-T0ix8GhtxyKVfUFEcvdNDt3YGqlwkFHbD4/5bgFUDgFmxhI/cSRAeJ87/Sz//Cq8Eam6JX/e23RkoFO71P7aAA=="],
 
-    "element-plus": ["element-plus@2.14.6", "https://registry.npmmirror.com/element-plus/-/element-plus-2.14.6.tgz", { "dependencies": { "@ctrl/tinycolor": "4.2.1", "@element-plus/icons-vue": "2.3.2", "@floating-ui/dom": "1.8.0", "@popperjs/core": "npm:@sxzz/popperjs-es@2.11.8", "@types/lodash": "4.17.25", "@types/lodash-es": "4.17.12", "@vueuse/core": "15.0.0", "async-validator": "4.2.5", "dayjs": "1.11.23", "lodash": "4.18.1", "lodash-es": "4.18.1", "lodash-unified": "1.0.3", "memoize-one": "6.0.0", "normalize-wheel-es": "1.2.0", "vue-component-type-helpers": "3.3.11" }, "peerDependencies": { "vue": "^3.3.7" } }, "sha512-GH0fMoMgVEKkHimoaKvg5B00NmfPbQ+qxX6/JrO7F+dLAC3atrZr2Y2MoccHMxS22M7QE12/s0DG0Zs49iwJ/A=="],
+    "element-plus": ["element-plus@2.14.7", "", { "dependencies": { "@ctrl/tinycolor": "^4.2.1", "@element-plus/icons-vue": "^2.3.2", "@floating-ui/dom": "^1.8.0", "@popperjs/core": "npm:@sxzz/popperjs-es@^2.11.8", "@types/lodash": "^4.17.24", "@types/lodash-es": "^4.17.12", "@vueuse/core": "15.0.0", "async-validator": "^4.2.5", "dayjs": "^1.11.20", "lodash": "^4.18.1", "lodash-es": "^4.18.1", "lodash-unified": "^1.0.3", "memoize-one": "^6.0.0", "normalize-wheel-es": "^1.2.0", "vue-component-type-helpers": "^3.3.11" }, "peerDependencies": { "vue": "^3.3.7" } }, "sha512-lrG7pZyCS+mpCNVpzxxyu5r35+T6V0hzkAeIwn7HA6to772XSTHKuYCZG51OfzlqaxGbNegLxs650zAF1j43gA=="],
 
     "emoji-regex": ["emoji-regex@8.0.0", "https://registry.npmmirror.com/emoji-regex/-/emoji-regex-8.0.0.tgz", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 
