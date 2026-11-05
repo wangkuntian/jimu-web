@@ -72,11 +72,15 @@ bun run dev                                 # 开发服务器 http://localhost:5
 
 ### 可复现的端到端
 
+推荐在 `../jimu` 执行 `make demo-e2e`：它会启动独立的 demo 栈，从 `secrets/admin_password.txt` 注入管理员密码并运行本文件。
+
+手工运行：
+
 ```bash
-E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD=Admin12345 bunx playwright test e2e/real-backend.spec.ts
+E2E_REAL_BACKEND=1 E2E_ADMIN_PASSWORD="$(cat ../jimu/secrets/admin_password.txt)" bunx playwright test e2e/real-backend.spec.ts
 ```
 
-`e2e/real-backend.spec.ts` 由 `E2E_REAL_BACKEND=1` 门控，默认跳过（CI 上没有后端）。两条用例均启用：一条真实注册 `e2e_<时间戳>` 账号，验证零角色进入用户工作区且访问管理面会被送回，再用 `admin` 确认租户列表渲染出真实的 `default` 行；另一条走「新建 → 分配套餐 → 删除」，使用新的字符串 ID 契约验证完整链路。
+`E2E_ADMIN_PASSWORD` 必填，缺失时用例跳过。`e2e/real-backend.spec.ts` 由 `E2E_REAL_BACKEND=1` 门控，默认跳过（CI 上没有后端）。三条用例：真实注册 `e2e_<时间戳>` 账号，验证零角色进入用户工作区且访问管理面会被送回；租户「新建 → 分配套餐 → 删除」；以及 admin 登录 → 租户/套餐 → 角色/用户 → 账号安全的 demo 全链路。demo 全链路创建的数据通过 API 清理。
 
 ## CLI 命令
 
