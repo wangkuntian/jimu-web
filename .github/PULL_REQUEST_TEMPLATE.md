@@ -19,7 +19,7 @@
 - [ ] `bun run check` 通过（契约同步、格式、lint、类型、单测、构建）
 - [ ] 行为变更补充了对应测试（Vitest 单测或 Playwright E2E）
 - [ ] 改动源码时同步更新了 `docs/releases/v<version>.md`
-- [ ] 契约变更时更新了 `contracts/backend-commit.txt` 并运行 `bun run api:types`
+- [ ] 契约变更时更新了 `contracts/jimu.lock.json` 并运行 `bun run api:types`
 - [ ] 文档已更新（README / AGENTS.md / CONTRIBUTING.md，如需要）
 
 ## 相关 Issue

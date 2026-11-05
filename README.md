@@ -11,7 +11,7 @@ Jimu Hub 是 Jimu 后端配套的独立前端项目，目标是为平台管理�
 - `jimu-web`：页面、路由、权限展示、API client、前端测试和静态资源部署。
 - `jimu`：Go API、数据库迁移、OpenAPI 来源和后端部署。
 - 两个仓库独立版本化、独立 CI 和独立发布。
-- 前端通过固定的 Swagger 2.0 契约生成 OpenAPI 3.0 文件并消费类型，`contracts/backend-commit.txt` 是契约 pin（`scripts/sync-contract.sh` 写入，CI 逐字节校验）。
+- 前端通过固定的 Swagger 2.0 契约生成 OpenAPI 3.0 文件并消费类型，`contracts/jimu.lock.json` 是契约 lockfile（`scripts/sync-contract.sh` 写入，CI 校验 commit 与 sha256）。
 
 ## 技术栈
 
@@ -64,7 +64,7 @@ bun run dev                                 # 开发服务器 http://localhost:5
 
 ### 验收路径与当前结果
 
-**注册（普通模式）→ 用新账号登录 → 用户工作区**与 **admin 登录 → 租户列表 → 新建 / 改套餐 / 删除**均已在真机上打通。后端 `cf116508ba73763edcf97599a9436628ce3969b1` 起把用户、租户和角色 ID 统一按 JSON string 输出，前端同步移除了旧的安全整数守卫；雪花 ID 不再经过 JavaScript `number`，行内动作会原样使用后端返回的字符串 ID。套餐 ID 与租户的 `plan_id` 同样使用字符串，浏览器不会在分配免费套餐等操作前把雪花 ID 舍入。当前契约 pin 为 `78e22be43761ce3a67dea0ec05b75ab6fcba9323`，追加了平台角色管理、权限回显和字符串权限 ID。
+**注册（普通模式）→ 用新账号登录 → 用户工作区**与 **admin 登录 → 租户列表 → 新建 / 改套餐 / 删除**均已在真机上打通。后端 `cf116508ba73763edcf97599a9436628ce3969b1` 起把用户、租户和角色 ID 统一按 JSON string 输出，前端同步移除了旧的安全整数守卫；雪花 ID 不再经过 JavaScript `number`，行内动作会原样使用后端返回的字符串 ID。套餐 ID 与租户的 `plan_id` 同样使用字符串，浏览器不会在分配免费套餐等操作前把雪花 ID 舍入。当前契约 lockfile 固定到 `v0.8.1`（commit `17aaab5`），包含平台角色管理、权限回显和字符串权限 ID。
 
 ### 权限前提
 
@@ -116,7 +116,7 @@ bun run check
 
 ## OpenAPI 契约
 
-后端提供的是 Swagger 2.0。前端把来源提交固定为 `contracts/backend-commit.txt` 中那行 40 位 SHA——这就是契约 pin——并把该提交的 `docs/openapi/swagger.yaml` 逐字节复制到 `contracts/jimu.swagger.yaml`。
+后端提供的是 Swagger 2.0。`contracts/jimu.lock.json` 记录来源仓库、ref、commit、模板契约版本和 `swagger_sha256`；前端把该提交的 `docs/openapi/swagger.yaml` 逐字节复制到 `contracts/jimu.swagger.yaml`。
 
 同步契约走脚本，它是唯一入口：
 
@@ -125,7 +125,7 @@ scripts/sync-contract.sh                  # 取本地 ../jimu 的 HEAD（提交�
 scripts/sync-contract.sh <sha|tag|branch> # 从公开远端 fetch --depth=1 取该提交
 ```
 
-脚本写回 `contracts/jimu.swagger.yaml` 与 `contracts/backend-commit.txt`，随后自动运行 `bun run api:types`。取「提交态」而不是工作区文件：后端仓库里未提交的本地改动不应该进契约副本；pin 也必须是**已推送**的提交，否则 CI 的 pin 校验会失败。`bun run api:convert` 只生成 `contracts/jimu.openapi.yaml`；通常直接运行 `bun run api:types`，它会先转换再生成 TypeScript 类型：
+脚本写回 `contracts/jimu.swagger.yaml` 与 `contracts/jimu.lock.json`，随后自动运行 `bun run api:types`。lockfile 中的 commit 必须是**已推送**的提交，否则 CI 的 lockfile 校验会失败。`bun run api:convert` 只生成 `contracts/jimu.openapi.yaml`；通常直接运行 `bun run api:types`，它会先转换再生成 TypeScript 类型：
 
 ```bash
 bun run api:types
@@ -133,7 +133,7 @@ bun run api:types
 
 生成文件 `src/shared/api/generated.ts` 只包含派生类型，不在其中添加手写业务逻辑。
 
-CI 的 `API Contract` job 除 `bun run api:check` 外还运行 `scripts/check_contract_pin.sh`：它从公开仓 `fetch --depth=1` 取 pin 的 SHA，再与 `contracts/jimu.swagger.yaml` 逐字节比对。这一步只读、零凭据、fail-closed——pin 未推送时 fetch 直接失败，契约副本无法悄悄偏离来源提交。
+CI 的 `API Contract` job 除 `bun run api:check` 外还运行 `scripts/check_contract_pin.sh`：它从公开仓取 lockfile 的 commit，校验 ref（发布 tag）、逐字节比对契约副本，并核对 `swagger_sha256`。这一步只读、零凭据、fail-closed——commit 未推送时 fetch 直接失败，契约副本无法悄悄偏离来源提交。
 
 后端 `/api/v1/admin/error-codes` 与 `/api/v1/admin/ratelimit/auth` 的重复 `basePath` 前缀已修正，生成路径不再重复 `/api/v1`；但这两条 console 能力尚未接通认证链，运行时仍返回 401，前端不消费。
 
