@@ -36,7 +36,7 @@ bun run api:types
 bun run dev
 ```
 
-开发服务器启动后访问 `http://localhost:5173`。Vite 会将 `/api` 请求代理到本地 Jimu 后端。
+开发服务器启动后访问 `http://localhost:5173`。Vite 会将 `/api` 请求代理到本地 Jimu 后端；默认目标是 `http://localhost:8080`，可用 `JIMU_API_PROXY_TARGET` 覆盖（`make demo` 使用独立端口）。
 
 ## 本地真机联调
 
