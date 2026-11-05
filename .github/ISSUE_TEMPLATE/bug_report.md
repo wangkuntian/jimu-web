@@ -29,7 +29,7 @@ assignees: ''
 - 页面路由: <!-- 如 /portal -->
 - 浏览器与版本:
 - 前端版本: <!-- tag 或 commit -->
-- 后端版本: <!-- jimu 的版本或 contracts/backend-commit.txt 记录的提交 -->
+- 后端版本: <!-- jimu 的版本或 contracts/jimu.lock.json 记录的 commit -->
 - OS:
 - Node 版本（仅本地开发相关时填写）:
 

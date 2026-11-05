@@ -9,7 +9,7 @@
 - 本仓库名为 `jimu-web`，产品名为 `Jimu Hub`。
 - 唯一包管理器为 `bun@1.4.3`；提交 `bun.lock`，不生成或提交 npm、Yarn、pnpm lockfile。
 - 不直接修改后端仓库（本地默认位于 `../jimu`）；后端变更应在后端仓库中完成。
-- 前后端通过 `contracts/jimu.swagger.yaml`、`contracts/jimu.openapi.yaml` 和 `contracts/backend-commit.txt` 关联。
+- 前后端通过 `contracts/jimu.swagger.yaml`、`contracts/jimu.openapi.yaml` 和 `contracts/jimu.lock.json` 关联。
 - 不在前端复制后端领域规则或自行伪造租户标识。
 
 ## 禁止自动提交
@@ -26,7 +26,7 @@
 - 分支、PR、CI、发布与版本日志流程见 [贡献指南](docs/CONTRIBUTING.md)；首次克隆后运行 `bun run hooks:install` 启用 commit-msg 钩子。
 - 修改代码、脚本或目录约定后，必须同步更新 README.md 对应章节。
 - 分支名沿用后端约定：`feature/<issue>-<slug>`，全小写短横线格式；`master` 有分支保护（`protect master`），只能经 PR 合入。
-- 契约变更流程：替换 `contracts/jimu.swagger.yaml` → 更新 `contracts/backend-commit.txt` → 运行 `bun run api:types`。
+- 契约变更流程：运行 `scripts/sync-contract.sh <ref>` 更新 `contracts/jimu.swagger.yaml` 与 `contracts/jimu.lock.json` → 运行 `bun run api:types`。
 - 需要后端领域规则（错误码分段、响应结构、归属模型、套餐与配额上限等）时查阅 `jimu` 仓库文档，不在本仓库复述。
 
 ## 架构约束
@@ -79,7 +79,7 @@
 - 代码改动先写聚焦测试，并先观察测试失败，再实现最小行为。
 - 提交前运行 `bun run check`；它等价于 CI 的 `Quality & Tests` + `API Contract` + `Build`，`E2E` 用 `bun run test:e2e`。
 - 改动产品代码（`src/`、`index.html`、`package.json`）时同步更新 `docs/releases/v<version>.md`，否则 CI 的 `Policy` job 失败。
-- 修改 Swagger 契约时同步更新 `contracts/backend-commit.txt`，再运行 `bun run api:types`。
+- 修改 Swagger 契约时同步更新 `contracts/jimu.lock.json`，再运行 `bun run api:types`。
 - 只改文档时至少运行 `bunx prettier --check <file>`。
 - 修改 workflow 时确认 `scripts/check_ci_gate.sh` 的 job 清单与适用标记同步更新（漏一个会让门禁静默失效）。
 - 修改脚本、工具或目录约定时同步更新 `README.md`。
