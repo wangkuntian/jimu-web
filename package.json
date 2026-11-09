@@ -22,9 +22,9 @@
     "check": "bun run api:check && bun run fmt:check && bun run lint && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
-    "@lucide/vue": "^1.47.0",
+    "@lucide/vue": "^1.69.0",
     "@tanstack/vue-query": "^5.104.5",
-    "element-plus": "^2.14.6",
+    "element-plus": "^2.14.7",
     "openapi-fetch": "^0.17.0",
     "pinia": "^4.1.0",
     "vue": "^3.5.44",
